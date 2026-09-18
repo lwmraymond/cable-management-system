@@ -234,3 +234,27 @@ def env(tmp_path):
     )
     session.close()
     engine.dispose()
+
+
+@pytest.fixture
+def floor_env(env):
+    from app.services.floorplan_editor import FloorPlanService as EditorService
+
+    outside = Location(tenant_id=env.tenants[0].id, identifier="OUTSIDE",
+                       name="Outside floor", location_type=LocationType.FLOOR)
+    env.db.add(outside)
+    env.db.flush()
+    rack = Rack(tenant_id=env.tenants[0].id, location_id=outside.id,
+                rack_identifier="OUTSIDE-RACK", name="Outside rack")
+    env.db.add(rack)
+    env.db.commit()
+
+    def service(actor=None):
+        return EditorService(env.db, env.service(actor).principal)
+
+    return SimpleNamespace(
+        **{**vars(env), "service": service},
+        tenant=env.tenants[0], other_tenant=env.tenants[1],
+        owner=env.owners[0], project=env.projects[0], other_project=env.projects[1],
+        floor=env.floors[0], rack=env.racks[0], outside_rack=rack,
+    )

@@ -50,9 +50,9 @@ class SecurityBoundaryMiddleware(BaseHTTPMiddleware):
         return request.client.host if request.client else "unknown"
 
     def _limiter_key(self, request: Request) -> str:
-        tenant = request.headers.get("x-tenant-id", "anonymous-tenant")
-        actor = request.headers.get("x-actor-id", "anonymous-actor")
-        return f"{tenant}|{actor}|{self._client_address(request)}"
+        # This middleware runs before authentication; identity headers cannot
+        # establish quota ownership and must not create fresh request budgets.
+        return f"ingress|{self._client_address(request)}"
 
     def _secure_request(self, request: Request) -> bool:
         if request.url.scheme == "https":
@@ -73,7 +73,7 @@ class SecurityBoundaryMiddleware(BaseHTTPMiddleware):
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "

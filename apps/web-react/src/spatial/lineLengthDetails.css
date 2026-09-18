@@ -1,0 +1,30 @@
+.line-length-details { margin-top:20px; font-size:12px; line-height:1.6; }
+.line-length-details h3 { font-size:13px; margin:0 0 10px; font-weight:600; }
+.line-length-registered { padding:12px; border:1px solid #d6e4ef; background:#f4f8fc; border-radius:6px; }
+.line-length-registered>span { color:#526274; display:block; }
+.line-length-registered>strong { font-size:21px; font-weight:600; color:#215b84; font-variant-numeric:tabular-nums; }
+.line-length-registered p { margin:5px 0 0; font-size:11px; color:#617589; }
+.line-length-totals { margin:10px 0; }
+.line-length-totals>div { display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid #e5ebf0; }
+.line-length-totals dt { color:#526274; }
+.line-length-totals dd { margin:0; white-space:nowrap; font-weight:600; font-variant-numeric:tabular-nums; }
+.line-length-coverage { color:#617589; font-size:11px; margin:8px 0; }
+.line-length-segments { padding-left:22px; margin:8px 0; max-height:320px; overflow:auto; }
+.line-length-segments li { padding:6px 0 10px 2px; border-bottom:1px solid #e8edf2; }
+.line-length-segments strong,.line-length-segments small { display:block; overflow-wrap:anywhere; }
+.line-length-segments strong { font-weight:550; }
+.line-length-segments small { color:#617589; font-size:10px; }
+.line-length-segments dl { display:flex; gap:14px; margin:4px 0 0; font-size:11px; }
+.line-length-segments dl>div { display:flex; gap:5px; }
+.line-length-segments dt { color:#617589; }
+.line-length-segments dd { margin:0; font-variant-numeric:tabular-nums; }
+.line-length-segments p { color:#7b6337; font-size:10px; margin:4px 0 0; }
+.line-length-note { padding:7px 9px; margin:7px 0; background:#f5f7f9; border-left:2px solid #b0c2d1; font-size:11px; color:#526274; }
+.connection-length-summary { padding:12px; border:1px solid #cadce9; border-radius:6px; background:#f4f8fc; margin:14px 0; }
+.connection-length-summary h3 { margin:0 0 8px; font-size:13px; }
+.connection-length-summary dl { margin:0; font-size:12px; }
+.connection-length-summary dl>div { display:flex; justify-content:space-between; gap:12px; padding:4px 0; }
+.connection-length-summary dd { margin:0; font-variant-numeric:tabular-nums; }
+.connection-length-summary .ant-form-item { margin:10px 0; }
+.connection-length-summary .ant-input-number { width:100%; }
+.connection-length-summary .length-final { border-top:1px solid #cadce9; padding-top:8px; font-weight:650; color:#215b84; }

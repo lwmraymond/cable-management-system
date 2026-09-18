@@ -21,8 +21,9 @@ trap cleanup EXIT
 cleanup
 printf 'dry_run_database=%s\n' "$DB_PATH"
 
+cd "$ROOT"
+PYTHONPATH=apps/api:. python -m pytest -q
 cd "$ROOT/apps/api"
-PYTHONPATH=.:../.. pytest -q
 PYTHONPATH=. python -m compileall -q app migrations
 cd "$ROOT"
 node --check apps/web/app.js

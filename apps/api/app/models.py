@@ -18,6 +18,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -31,7 +32,9 @@ class Base(DeclarativeBase):
 
 
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
     )
@@ -129,12 +132,26 @@ class UserIdentity(Base, UUIDMixin, TimestampMixin):
 
 class Tenant(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "tenants"
-    __table_args__ = (UniqueConstraint("slug", name="uq_tenant_slug"),)
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_tenant_slug"),
+        CheckConstraint("workspace_kind IN ('personal', 'shared')", name="ck_workspace_kind"),
+        CheckConstraint(
+            "workspace_kind != 'personal' OR workspace_owner_id IS NOT NULL",
+            name="ck_personal_workspace_owner",
+        ),
+    )
     owner_organization_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(180), nullable=False)
     slug: Mapped[str] = mapped_column(String(100), nullable=False)
+    workspace_kind: Mapped[str] = mapped_column(
+        String(20), default="shared", server_default="shared", nullable=False
+    )
+    workspace_owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("user_identities.id", ondelete="RESTRICT", name="fk_workspace_owner"),
+    )
     compliance_mode: Mapped[str] = mapped_column(String(20), default="assisted", nullable=False)
     active_standard_profile_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("standard_profiles.id"), nullable=True
@@ -166,7 +183,9 @@ class StandardProfile(Base, UUIDMixin, TimestampMixin):
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     rules_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     identifier_templates: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
-    validation_rules: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    validation_rules: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, default=list, nullable=False
+    )
     label_templates: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     required_records: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
 
@@ -225,9 +244,7 @@ class Location(Base, TenantOwnedMixin):
 
 class AccessGrant(Base, TenantOwnedMixin):
     __tablename__ = "access_grants"
-    __table_args__ = (
-        Index("ix_access_grant_subject", "tenant_id", "subject_user_id", "status"),
-    )
+    __table_args__ = (Index("ix_access_grant_subject", "tenant_id", "subject_user_id", "status"),)
     subject_organization_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=False
     )
@@ -247,7 +264,9 @@ class AccessGrant(Base, TenantOwnedMixin):
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     status: Mapped[AccessGrantStatus] = mapped_column(
-        SAEnum(AccessGrantStatus, native_enum=False), default=AccessGrantStatus.PENDING, nullable=False
+        SAEnum(AccessGrantStatus, native_enum=False),
+        default=AccessGrantStatus.PENDING,
+        nullable=False,
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_by: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True))
@@ -260,7 +279,10 @@ class Rack(Base, TenantOwnedMixin):
         CheckConstraint("height_u >= 1 AND height_u <= 60", name="ck_rack_height"),
     )
     location_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=False, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("locations.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     rack_identifier: Mapped[str] = mapped_column(String(180), nullable=False)
     name: Mapped[str] = mapped_column(String(180), nullable=False)
@@ -306,7 +328,10 @@ class Device(Base, TenantOwnedMixin):
         Uuid(as_uuid=True), ForeignKey("racks.id", ondelete="SET NULL"), index=True
     )
     location_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=False, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("locations.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     template_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("device_templates.id")
@@ -366,13 +391,21 @@ class Pathway(Base, TenantOwnedMixin):
         UniqueConstraint("tenant_id", "identifier", name="uq_pathway_identifier_tenant"),
     )
     location_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=False, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("locations.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     identifier: Mapped[str] = mapped_column(String(180), nullable=False)
     name: Mapped[str] = mapped_column(String(180), nullable=False)
     pathway_type: Mapped[str] = mapped_column(String(80), nullable=False)
     capacity_area_mm2: Mapped[float | None] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(30), default="active", nullable=False)
+    cable_policy: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        default=lambda: {"allows_cables": True, "allowed_media": ["copper", "fiber"]},
+        nullable=False,
+    )
 
 
 class PathwaySegment(Base, TenantOwnedMixin):
@@ -381,7 +414,10 @@ class PathwaySegment(Base, TenantOwnedMixin):
         UniqueConstraint("tenant_id", "pathway_id", "sequence", name="uq_pathway_segment_sequence"),
     )
     pathway_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("pathways.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("pathways.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     name: Mapped[str] = mapped_column(String(180), nullable=False)
@@ -426,7 +462,14 @@ class CableTermination(Base, TenantOwnedMixin):
     __tablename__ = "cable_terminations"
     __table_args__ = (
         UniqueConstraint("tenant_id", "cable_id", "side", name="uq_cable_side"),
-        UniqueConstraint("tenant_id", "port_id", name="uq_physical_port_termination"),
+        Index(
+            "uq_active_cable_port_termination",
+            "tenant_id",
+            "port_id",
+            unique=True,
+            sqlite_where=text("deleted_at IS NULL"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
         CheckConstraint("side IN ('A', 'B')", name="ck_cable_termination_side"),
     )
     cable_id: Mapped[uuid.UUID] = mapped_column(
@@ -444,6 +487,12 @@ class CableRouteSegment(Base, TenantOwnedMixin):
     __tablename__ = "cable_route_segments"
     __table_args__ = (
         UniqueConstraint("tenant_id", "cable_id", "sequence", name="uq_cable_route_sequence"),
+        CheckConstraint(
+            "(start_offset_m IS NULL AND end_offset_m IS NULL AND geometry_hash IS NULL) OR "
+            "(start_offset_m IS NOT NULL AND end_offset_m IS NOT NULL AND geometry_hash IS NOT NULL "
+            "AND start_offset_m >= 0 AND end_offset_m >= 0)",
+            name="ck_cable_route_portion",
+        ),
     )
     cable_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("cables.id", ondelete="CASCADE"), nullable=False, index=True
@@ -452,6 +501,9 @@ class CableRouteSegment(Base, TenantOwnedMixin):
         Uuid(as_uuid=True), ForeignKey("pathway_segments.id", ondelete="RESTRICT"), nullable=False
     )
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_offset_m: Mapped[float | None] = mapped_column(Float)
+    end_offset_m: Mapped[float | None] = mapped_column(Float)
+    geometry_hash: Mapped[str | None] = mapped_column(String(64))
 
 
 class WorkOrder(Base, TenantOwnedMixin):
@@ -460,7 +512,10 @@ class WorkOrder(Base, TenantOwnedMixin):
         UniqueConstraint("tenant_id", "work_order_number", name="uq_work_order_number_tenant"),
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     location_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("locations.id"), index=True
@@ -532,7 +587,9 @@ class AuditEvent(Base, UUIDMixin):
     object_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     before: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     after: Mapped[dict[str, Any] | None] = mapped_column(JSON)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
     ip_address: Mapped[str | None] = mapped_column(String(64))
     user_agent: Mapped[str | None] = mapped_column(String(500))
     request_id: Mapped[str | None] = mapped_column(String(100), index=True)

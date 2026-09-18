@@ -1,0 +1,40 @@
+.workspace-guide-boundary { display:contents; }
+.workspace-guide .ant-drawer-title { font-size:16px; color:#263b50; }
+.workspace-guide .ant-drawer-body { padding:0 22px 22px; }
+.workspace-guide-content { color:#2c3e50; font-size:14px; line-height:1.8; }
+.workspace-guide-intro { margin:18px 0 14px; color:#526679; }
+.workspace-guide-controls { position:sticky; top:0; z-index:1; padding:12px 0; background:#fff; border-bottom:1px solid #e2e8ee; }
+.workspace-guide-controls .ant-input { font-size:14px; }
+.workspace-guide-progress { display:flex; align-items:center; gap:14px; margin-top:10px; }
+.workspace-guide-progress>span { flex:none; font-size:13px; }
+.workspace-guide-progress .ant-progress { flex:1; min-width:0; margin:0; }
+.workspace-guide-controls p { margin:3px 0 0; font-size:12px; color:#687b8d; }
+.workspace-guide-controls p[role=status] { color:#80642d; }
+.workspace-guide-content h2 { margin:20px 0 12px; font-size:16px; font-weight:650; }
+.workspace-guide-content h2 small { font-size:12px; font-weight:400; color:#687b8d; }
+.workspace-guide-step { padding:16px; margin:0 0 12px; border:1px solid #dce5ed; border-radius:8px; background:#fff; }
+.workspace-guide-step-heading { display:flex; align-items:flex-start; gap:12px; }
+.workspace-guide-step-heading>span { display:grid; place-items:center; flex:none; width:28px; height:28px; border-radius:6px; background:#eaf2f8; color:#38698c; font-weight:650; font-size:14px; }
+.workspace-guide-step h3 { margin:0; font-size:15px; font-weight:650; line-height:1.65; }
+.workspace-guide-step-heading small { font-size:12px; color:#657c8e; }
+.workspace-guide-step ol { padding-left:20px; margin:12px 0; }
+.workspace-guide-step li { padding-left:2px; margin-bottom:8px; }
+.workspace-guide-step-actions { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 12px; }
+.workspace-guide-step-actions .ant-btn { font-size:13px; }
+.workspace-guide-step .ant-checkbox-label { font-size:13px; color:#526679; }
+.workspace-guide-reference { margin-top:18px; padding:0 2px; }
+.workspace-guide-reference p { margin:8px 0 12px; color:#526679; }
+.workspace-guide-reference dl { margin:0; }
+.workspace-guide-reference dl>div { display:grid; grid-template-columns:minmax(120px, .7fr) minmax(0,1.3fr); gap:14px; padding:9px 0; border-bottom:1px solid #e9edf2; }
+.workspace-guide-reference dt { margin:0; }
+.workspace-guide-reference dd { margin:0; color:#526679; }
+.workspace-guide-reference kbd { font:inherit; font-size:13px; font-weight:500; color:#365976; }
+.workspace-guide-empty { padding:28px 8px; text-align:center; color:#687b8d; }
+@media(max-width:480px) {
+  .workspace-guide .ant-drawer-body { padding:0 14px 18px; }
+  .workspace-guide-step { padding:13px; }
+  .workspace-guide-progress { flex-wrap:wrap; gap:2px 10px; }
+  .workspace-guide-progress .ant-progress { flex-basis:100%; }
+  .workspace-guide-reference dl>div { grid-template-columns:minmax(0,1fr); gap:3px; }
+  .workspace-guide-step-actions .ant-btn { min-height:34px; height:auto; white-space:normal; text-align:left; }
+}

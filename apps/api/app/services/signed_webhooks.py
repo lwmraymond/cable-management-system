@@ -28,6 +28,10 @@ from app.models import Tenant
 from app.security import Principal, require_permission, resolve_principal
 
 
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
 class SignedWebhookService:
     MAX_PAYLOAD_BYTES = 512 * 1024
     MAX_RESPONSE_EXCERPT = 2_000
@@ -139,7 +143,8 @@ class SignedWebhookService:
             timeout_seconds=timeout,
             max_attempts=max_attempts,
         )
-        self.db.add(endpoint); self.db.flush()
+        self.db.add(endpoint)
+        self.db.flush()
         record_audit(
             self.db,
             principal=actual,
@@ -184,7 +189,8 @@ class SignedWebhookService:
             attempts=0,
             next_attempt_at=now,
         )
-        self.db.add(outbox); self.db.flush()
+        self.db.add(outbox)
+        self.db.flush()
         record_audit(
             self.db,
             principal=actual,
@@ -219,7 +225,7 @@ class SignedWebhookService:
             "endpoint_id": str(row.endpoint_id),
             "state": row.state,
             "attempts": row.attempts,
-            "next_attempt_at": row.next_attempt_at.isoformat(),
+            "next_attempt_at": _as_utc(row.next_attempt_at).isoformat(),
             "delivered_at": row.delivered_at.isoformat() if row.delivered_at else None,
             "last_error": row.last_error,
             "payload_sha256": row.payload_sha256,
@@ -258,7 +264,8 @@ class SignedWebhookService:
             return self.describe(row.id)
         if row.state == "dead":
             raise ConflictError("Dead-letter webhook requires explicit requeue")
-        if row.next_attempt_at > current:
+        current = _as_utc(current)
+        if _as_utc(row.next_attempt_at) > current:
             raise ConflictError("Webhook is not due yet")
         if not endpoint.active:
             raise ConflictError("Webhook endpoint is inactive")

@@ -8,9 +8,10 @@ import qrcode.image.svg
 from sqlalchemy.orm import Session
 
 from app.audit import record_audit
-from app.exceptions import NotFoundError
 from app.models import Cable, Label
 from app.security import Principal, require_permission
+from app.services.cable_lifecycle import lock_active_cable
+from app.services.resource_scope import ResourceScope
 from app.services.identifiers import get_active_profile
 
 
@@ -19,13 +20,14 @@ class LabelService:
         self.session = session
         self.principal = principal
 
-    def create_cable_label(
-        self, cable_id: uuid.UUID, public_base_url: str
-    ) -> tuple[Label, str]:
-        require_permission(self.principal, "label:create")
-        cable = self.session.get(Cable, cable_id)
-        if not cable:
-            raise NotFoundError("Cable not found in tenant")
+    def create_cable_label(self, cable_id: uuid.UUID, public_base_url: str) -> tuple[Label, str]:
+        scope = ResourceScope(self.session, self.principal)
+        require_permission(scope.principal, "label:create")
+        cable = scope.get(Cable, cable_id)
+        scope.require(cable, "label:create")
+        cable = lock_active_cable(self.session, self.principal, cable.id)
+        scope = ResourceScope(self.session, self.principal)
+        scope.require(cable, "label:create")
         profile = get_active_profile(self.session, self.principal.tenant_id)
         payload = f"{public_base_url.rstrip('/')}/app/?fieldCable={cable.id}"
         label = Label(

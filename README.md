@@ -6,6 +6,8 @@
 
 ## 当前交付
 
+2026-09-18 本地验证版本：个人／共享工作区、3D 建模与接线、线缆维护、HPC 场景及局部线槽路由，详见 [版本说明](docs/RELEASE_2026-09-18.md)。
+
 - FastAPI、SQLAlchemy、Alembic 模块化单体
 - 显式组织、租户、项目、位置、机架、设备、端口、路径、线缆、工单、测试、标签和审计模型
 - 应用层租户过滤与写入保护；PostgreSQL 强制 RLS 迁移
@@ -14,7 +16,8 @@
 - 穿越 patch-panel 前后端口映射的递归物理线缆追踪
 - TIA-606-D 可配置基线、标识符模板、QR 标签及辅助合规报告
 - 安装、测试、独立审批、投入使用和追加式审计工作流
-- 数据驱动的运营界面、原生 WebGL 机架和路径高亮
+- 数据驱动的运营界面；新增 [Three.js 3D 空间工作区](docs/3D_WORKSPACE.md)，支持创建房间、批量机柜、设备、带标记线槽和线缆，保存机柜位置并高亮查看端口连接；原生 WebGL 界面保留
+- 规划／运维工作助手、自动资料检查、建议编号与空闲 U 位、可搜索的 [3D 使用教程](docs/USER_GUIDE_3D.md)；后续能力及 Observium 方案见 [产品路线](docs/PRODUCT_ROADMAP_AND_CONNECTORS.md)
 - Northstar University、Metro Structured Cabling Ltd 和第二租户隔离演示数据
 - OIDC JWT/JWKS 验证、Principal 映射、严格 CORS/TLS、rate limit 与 cookie/CSRF 边界
 - 普通 PostgreSQL 应用角色 Forced-RLS 攻击矩阵（脚本已实现，真实 runtime 待执行）
@@ -24,7 +27,19 @@
 
 完整模块审核见 [`docs/WORK_PROGRESS.md`](docs/WORK_PROGRESS.md)，机器可筛选版见仓库根目录 `WORK_PROGRESS.xlsx`。
 
+工作台首页、位置目录与范围切换的交互说明见 [工作台界面改进](docs/WORKSPACE_UI.md)。
+
+账号个人／共享空间、成员权限和网页 SSO 转入接口见 [账号工作空间与 SSO](docs/ACCOUNT_WORKSPACES_AND_SSO.md)。
+
+线缆删除／拆除及端口释放规则见 [线缆维护](docs/CABLE_MAINTENANCE.md)。
+
+LDAP 与其他对象删除的实施计划见 [LDAP 认证与对象删除（2026-09-18）](docs/planning/LDAP_AND_OBJECT_DELETION_2026-09-18.md)。
+
+最新产品质量复查、已修复缺陷与发布门槛见 [产品质量复查（2026-09-18）](docs/planning/PRODUCT_READINESS_REVIEW_2026-09-18.md)。
+
 ## 本地快速运行（SQLite）
+
+已验证的 macOS 构建、后台启动/停止及演示数据说明见 [本地开发指南](docs/LOCAL_DEVELOPMENT.md)。
 
 ```bash
 python -m venv .venv
@@ -114,4 +129,4 @@ CSV 对可能触发电子表格公式的文本值进行前缀中和。当前边�
 
 ## 重要边界
 
-本仓库是经过测试的第一条纵向链路，不是主构建文档全部范围的最终商业版本。尚未完成的重点包括真实 Keycloak token lifecycle/MFA、真实 PostgreSQL RLS 运行证明、React package build/browser E2E、安全对象存储、完整纤芯/熔接模型、2D 编辑器、CSV/XLSX dry-run 导入、NetBox/Webhook、离线 PWA、负载验证、备份恢复和 Kubernetes 生产部署。
+本仓库是经过测试的第一条纵向链路，不是主构建文档全部范围的最终商业版本。尚未完成的重点包括真实 Keycloak token lifecycle/MFA、真实 PostgreSQL RLS 运行证明、跨浏览器端到端覆盖、安全对象存储、完整纤芯/熔接模型、2D 编辑器、CSV/XLSX dry-run 导入、NetBox/Webhook、离线 PWA、负载验证、备份恢复和 Kubernetes 生产部署。

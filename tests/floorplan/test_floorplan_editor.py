@@ -263,11 +263,11 @@ def test_raw_cross_tenant_revision_foreign_key_is_rejected(floor_env):
             insert(FloorPlanRevision.__table__).values(
                 tenant_id=floor_env.other_tenant.id,
                 floor_plan_id=uuid.UUID(plan["id"]),
-                revision=9,
+                revision_number=9,
                 schema_version=1,
                 document=document(plan),
                 checksum_sha256="0" * 64,
-                note="foreign",
+                change_summary="foreign",
                 created_by=floor_env.owner.id,
                 version=1,
             )

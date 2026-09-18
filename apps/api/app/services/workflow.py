@@ -4,12 +4,14 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.audit import record_audit
 from app.exceptions import ConflictError, NotFoundError, ValidationError
 from app.models import Cable, CableStatus, TestRecord, WorkOrder, WorkOrderStatus
 from app.security import Principal, require_permission
+from app.services.resource_scope import ResourceScope
 
 
 class CableWorkflowService:
@@ -17,13 +19,52 @@ class CableWorkflowService:
         self.session = session
         self.principal = principal
 
-    def mark_installed(
-        self, cable_id: uuid.UUID, work_order_id: uuid.UUID | None = None
-    ) -> Cable:
-        require_permission(self.principal, "cable:install")
-        cable = self.session.get(Cable, cable_id)
-        if not cable:
+    def _locked_cable(self, cable_id, permission):
+        scope = ResourceScope(self.session, self.principal)
+        cable = scope.get(Cable, cable_id)
+        scope.require(cable, permission)
+        self.session.flush()
+        # Serialize testing and approval on the same cable, including SQLite where
+        # FOR UPDATE is ignored. The no-op does not advance the domain version.
+        if self.session.get_bind().dialect.name == "sqlite":
+            self.session.execute(
+                update(Cable)
+                .where(Cable.id == cable.id, Cable.tenant_id == self.principal.tenant_id)
+                .values(version=Cable.version, updated_at=Cable.updated_at)
+                .execution_options(synchronize_session=False)
+            )
+        locked = self.session.scalar(
+            select(Cable)
+            .where(
+                Cable.id == cable.id,
+                Cable.tenant_id == self.principal.tenant_id,
+                Cable.deleted_at.is_(None),
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if locked is None:
             raise NotFoundError("Cable not found in tenant")
+        # Everything pending was flushed above. Refresh cached identities/grants as
+        # well as the cable because authorization may change while waiting for the lock.
+        self.session.expire_all()
+        ResourceScope(self.session, self.principal).require(locked, permission)
+        return locked
+
+    def _work_order(self, work_order_id, cable, permission):
+        if work_order_id is None:
+            return None
+        scope = ResourceScope(self.session, self.principal)
+        work_order = scope.get(WorkOrder, work_order_id)
+        if work_order.cable_id not in {None, cable.id} or work_order.project_id != cable.project_id:
+            raise NotFoundError("Work order not found for cable in the same project")
+        scope.require(work_order, permission)
+        return work_order
+
+    def mark_installed(self, cable_id: uuid.UUID, work_order_id: uuid.UUID | None = None) -> Cable:
+        require_permission(self.principal, "cable:install")
+        cable = self._locked_cable(cable_id, "cable:install")
+        work_order = self._work_order(work_order_id, cable, "cable:install")
         allowed = {
             CableStatus.PLANNED,
             CableStatus.APPROVED,
@@ -37,10 +78,7 @@ class CableWorkflowService:
         cable.installation_status = CableStatus.INSTALLED
         cable.installer_id = self.principal.actor_id
         cable.installed_at = datetime.now(UTC)
-        if work_order_id:
-            work_order = self.session.get(WorkOrder, work_order_id)
-            if not work_order or work_order.cable_id not in {None, cable.id}:
-                raise NotFoundError("Work order not found for cable in tenant")
+        if work_order:
             work_order.status = WorkOrderStatus.AWAITING_TEST
         record_audit(
             self.session,
@@ -64,9 +102,8 @@ class CableWorkflowService:
         attachment_name: str | None = None,
     ) -> TestRecord:
         require_permission(self.principal, "cable:test")
-        cable = self.session.get(Cable, cable_id)
-        if not cable:
-            raise NotFoundError("Cable not found in tenant")
+        cable = self._locked_cable(cable_id, "cable:test")
+        work_order = self._work_order(work_order_id, cable, "cable:test")
         if cable.installation_status not in {
             CableStatus.INSTALLED,
             CableStatus.TERMINATED,
@@ -91,10 +128,7 @@ class CableWorkflowService:
         cable.test_status = normalized
         cable.tested_at = record.tested_at
         cable.installation_status = CableStatus.TESTED
-        if work_order_id:
-            work_order = self.session.get(WorkOrder, work_order_id)
-            if not work_order or work_order.cable_id not in {None, cable.id}:
-                raise NotFoundError("Work order not found for cable in tenant")
+        if work_order:
             work_order.status = WorkOrderStatus.AWAITING_APPROVAL
         record_audit(
             self.session,
@@ -109,27 +143,40 @@ class CableWorkflowService:
 
     def approve_test(self, test_record_id: uuid.UUID) -> TestRecord:
         require_permission(self.principal, "cable:approve")
-        record = self.session.get(TestRecord, test_record_id)
-        if not record:
-            raise NotFoundError("Test record not found in tenant")
+        scope = ResourceScope(self.session, self.principal)
+        record = scope.get(TestRecord, test_record_id)
+        cable = self._locked_cable(record.cable_id, "cable:approve")
+        self.session.refresh(record)
         if record.tester_id == self.principal.actor_id:
             raise ConflictError("A tester may not approve their own restricted test record")
-        if record.status == "approved":
-            return record
-        cable = self.session.get(Cable, record.cable_id)
-        if not cable:
-            raise NotFoundError("Cable not found in tenant")
         if record.result != "PASS":
             raise ConflictError("Failed test records cannot commission a cable")
+        latest_id = self.session.scalar(
+            select(TestRecord.id)
+            .where(
+                TestRecord.tenant_id == self.principal.tenant_id,
+                TestRecord.cable_id == cable.id,
+                TestRecord.deleted_at.is_(None),
+            )
+            .order_by(
+                TestRecord.tested_at.desc(), TestRecord.created_at.desc(), TestRecord.id.desc()
+            )
+            .limit(1)
+        )
+        if latest_id != record.id or cable.test_status != "PASS":
+            raise ConflictError("Test was superseded; only the latest passing test can be approved")
+        if record.status == "approved" and cable.installation_status == CableStatus.IN_SERVICE:
+            return record
+        if cable.installation_status != CableStatus.TESTED:
+            raise ConflictError("Cable must be in tested state before approval")
+        work_order = self._work_order(record.work_order_id, cable, "cable:approve")
         record.status = "approved"
         record.approved_by = self.principal.actor_id
         record.approved_at = datetime.now(UTC)
         before = cable.installation_status.value
         cable.installation_status = CableStatus.IN_SERVICE
-        if record.work_order_id:
-            work_order = self.session.get(WorkOrder, record.work_order_id)
-            if work_order:
-                work_order.status = WorkOrderStatus.COMPLETED
+        if work_order:
+            work_order.status = WorkOrderStatus.COMPLETED
         record_audit(
             self.session,
             principal=self.principal,

@@ -125,8 +125,8 @@ def test_application_registers_floor_plan_models_and_router():
     for relative in ("apps/api/app/db.py", "apps/api/migrations/env.py"):
         source = (ROOT / relative).read_text()
         assert "from app import floorplan_models" in source
-    fiber_api = (ROOT / "apps/api/app/api/fiber.py").read_text()
-    assert "from app.api.floorplan import build_floorplan_router" in fiber_api
-    assert "root.include_router(build_floorplan_router(get_db, get_principal))" in fiber_api
-    main = (ROOT / "apps/api/app/main.py").read_text()
-    assert "build_fiber_router(get_db, get_principal)" in main
+    from app.main import app
+
+    paths = app.openapi()["paths"]
+    assert {"get", "post"} <= paths["/api/v1/floor-plans"].keys()
+    assert "put" in paths["/api/v1/floor-plans/{plan_id}/draft"]

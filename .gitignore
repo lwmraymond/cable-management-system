@@ -12,3 +12,10 @@ storage/
 .DS_Store
 .idea/
 .vscode/
+
+# Local builds and runtime state
+apps/web-react/dist/
+*.tsbuildinfo
+.local/
+*.egg-info/
+build/

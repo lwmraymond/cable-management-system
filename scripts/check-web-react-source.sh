@@ -34,7 +34,9 @@ declare module "*" {
 declare namespace JSX { interface IntrinsicElements { [name: string]: any } }
 TS
 
-mapfile -t SOURCE_FILES < <(find "$WEB/src" -type f \( -name '*.ts' -o -name '*.tsx' \) | sort)
+SOURCE_FILES=()
+while IFS= read -r file; do SOURCE_FILES+=("$file"); done < <(find "$WEB/src" -type f \( -name '*.ts' -o -name '*.tsx' \) | sort)
+export PATH="$WEB/node_modules/.bin:$PATH"
 tsc --noEmit --noCheck --skipLibCheck --target ES2022 --module ESNext \
   --moduleResolution Bundler --jsx react-jsx --lib ES2022,DOM,DOM.Iterable \
   "$TMP/modules.d.ts" "$WEB/vite.config.ts" "${SOURCE_FILES[@]}"

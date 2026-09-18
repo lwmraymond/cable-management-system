@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from itertools import islice
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -14,13 +15,21 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.cable_lifecycle import build_cable_lifecycle_router
 from app.api.deps import get_db, get_platform_db, get_principal
 from app.api.fiber import build_fiber_router
 from app.api.fiber_advanced import build_fiber_advanced_router
+from app.api.floorplan import build_floorplan_router
+from app.api.integrations import build_integrations_router
+from app.api.scene import build_scene_router
+from app.api.projects import build_projects_router
+from app.api.workspaces import build_workspaces_router
+from app.api.browser_auth import build_browser_auth_router
 from app.audit import record_audit
 from app.config import get_settings
 from app.db import SessionLocal
 from app.exceptions import DomainError, NotFoundError
+from app.field_idempotency import FieldIdempotencyMiddleware
 from app.http_security import SecurityBoundaryMiddleware
 from app.models import (
     AccessGrant,
@@ -29,7 +38,6 @@ from app.models import (
     Cable,
     CableStatus,
     Device,
-    DeviceTemplate,
     Location,
     Organization,
     OrganizationType,
@@ -43,7 +51,6 @@ from app.models import (
     TestRecord,
     UserIdentity,
     WorkOrder,
-    WorkOrderStatus,
 )
 from app.schemas import (
     AccessGrantCreate,
@@ -65,13 +72,16 @@ from app.schemas import (
     WorkOrderRead,
 )
 from app.security import Principal, require_permission
+from app.services.account_scope_endpoints import AccountScopeEndpoints
 from app.services.compliance import ComplianceService
 from app.services.connectivity import ConnectivityService
 from app.services.infrastructure import InfrastructureService
 from app.services.labels import LabelService
 from app.services.reporting import ReportingService
+from app.services.resource_scope import ResourceScope
 from app.services.topology_trace import TopologyTraceService
 from app.services.workflow import CableWorkflowService
+from app.web import SPAStaticFiles
 
 settings = get_settings()
 app = FastAPI(
@@ -81,8 +91,16 @@ app = FastAPI(
     openapi_url=f"{settings.api_prefix}/openapi.json",
     docs_url=f"{settings.api_prefix}/docs",
 )
+app.include_router(build_cable_lifecycle_router(get_db, get_principal), prefix=settings.api_prefix)
 app.include_router(build_fiber_router(get_db, get_principal), prefix=settings.api_prefix)
 app.include_router(build_fiber_advanced_router(get_db, get_principal), prefix=settings.api_prefix)
+app.include_router(build_floorplan_router(get_db, get_principal), prefix=settings.api_prefix)
+app.include_router(build_integrations_router(get_db, get_principal), prefix=settings.api_prefix)
+app.include_router(build_scene_router(get_db, get_principal), prefix=settings.api_prefix)
+app.include_router(build_projects_router(get_db, get_principal), prefix=settings.api_prefix)
+app.include_router(build_workspaces_router(), prefix=settings.api_prefix)
+app.include_router(build_browser_auth_router(), prefix=settings.api_prefix)
+app.add_middleware(FieldIdempotencyMiddleware, api_prefix=settings.api_prefix)
 app.add_middleware(SecurityBoundaryMiddleware, settings=settings)
 app.add_middleware(
     CORSMiddleware,
@@ -305,7 +323,7 @@ def list_locations(
     statement = select(Location).order_by(Location.identifier)
     if parent_id is not None:
         statement = statement.where(Location.parent_id == parent_id)
-    return db.scalars(statement).all()
+    return ResourceScope(db, principal).visible(db.scalars(statement), "location:read")
 
 
 @app.post(
@@ -334,7 +352,7 @@ def list_racks(
     statement = select(Rack).order_by(Rack.rack_identifier)
     if location_id:
         statement = statement.where(Rack.location_id == location_id)
-    return db.scalars(statement).all()
+    return ResourceScope(db, principal).visible(db.scalars(statement), "rack:read")
 
 
 @app.post(
@@ -359,6 +377,8 @@ def rack_elevation(
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_principal),
 ) -> dict[str, Any]:
+    scope = ResourceScope(db, principal)
+    scope.require(scope.get(Rack, rack_id), "rack:read")
     return InfrastructureService(db, principal).rack_elevation(rack_id)
 
 
@@ -370,10 +390,7 @@ def rack_elevation(
 def list_device_templates(
     db: Session = Depends(get_db), principal: Principal = Depends(get_principal)
 ):
-    require_permission(principal, "device:read")
-    return db.scalars(
-        select(DeviceTemplate).order_by(DeviceTemplate.manufacturer, DeviceTemplate.model)
-    ).all()
+    return AccountScopeEndpoints(db, principal).templates()
 
 
 @app.post(
@@ -387,6 +404,7 @@ def create_device_template(
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_principal),
 ):
+    AccountScopeEndpoints(db, principal).require_member("device:create")
     template = InfrastructureService(db, principal).create_template(**payload.model_dump())
     db.commit()
     return template
@@ -402,7 +420,7 @@ def list_devices(
     statement = select(Device).order_by(Device.identifier)
     if rack_id:
         statement = statement.where(Device.rack_id == rack_id)
-    return db.scalars(statement).all()
+    return ResourceScope(db, principal).visible(db.scalars(statement), "device:read")
 
 
 @app.post(
@@ -428,6 +446,8 @@ def list_ports(
     principal: Principal = Depends(get_principal),
 ):
     require_permission(principal, "port:read")
+    scope = ResourceScope(db, principal)
+    scope.require(scope.get(Device, device_id), "port:read")
     return db.scalars(
         select(Port)
         .where(Port.device_id == device_id)
@@ -440,7 +460,9 @@ def list_pathways(
     db: Session = Depends(get_db), principal: Principal = Depends(get_principal)
 ) -> list[dict[str, Any]]:
     require_permission(principal, "pathway:read")
-    rows = db.scalars(select(Pathway).order_by(Pathway.identifier)).all()
+    rows = ResourceScope(db, principal).visible(
+        db.scalars(select(Pathway).order_by(Pathway.identifier)), "pathway:read"
+    )
     return [
         {
             "id": str(row.id),
@@ -475,10 +497,14 @@ def list_cables(
     principal: Principal = Depends(get_principal),
 ):
     require_permission(principal, "cable:read")
-    statement = select(Cable).order_by(Cable.identifier).limit(limit).offset(offset)
+    statement = select(Cable).order_by(Cable.identifier, Cable.id)
     if status:
         statement = statement.where(Cable.installation_status == status)
-    return db.scalars(statement).all()
+    scope = ResourceScope(db, principal)
+    if scope.principal.is_tenant_member:
+        return db.scalars(statement.limit(limit).offset(offset)).all()
+    visible = scope.iter_visible(db.scalars(statement).yield_per(200), "cable:read")
+    return list(islice(visible, offset, offset + limit))
 
 
 @app.post(
@@ -523,7 +549,9 @@ def list_work_orders(
     db: Session = Depends(get_db), principal: Principal = Depends(get_principal)
 ):
     require_permission(principal, "work_order:read")
-    return db.scalars(select(WorkOrder).order_by(WorkOrder.created_at.desc())).all()
+    return ResourceScope(db, principal).visible(
+        db.scalars(select(WorkOrder).order_by(WorkOrder.created_at.desc())), "work_order:read"
+    )
 
 
 @app.post(
@@ -537,13 +565,7 @@ def create_work_order(
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_principal),
 ):
-    require_permission(principal, "work_order:create")
-    work_order = WorkOrder(
-        tenant_id=principal.tenant_id,
-        status=WorkOrderStatus.READY,
-        created_by=principal.actor_id,
-        **payload.model_dump(),
-    )
+    work_order = AccountScopeEndpoints(db, principal).work_order(payload)
     db.add(work_order)
     db.flush()
     record_audit(
@@ -608,7 +630,7 @@ def list_test_results(
     statement = select(TestRecord).order_by(TestRecord.tested_at.desc())
     if cable_id:
         statement = statement.where(TestRecord.cable_id == cable_id)
-    return db.scalars(statement).all()
+    return ResourceScope(db, principal).visible(db.scalars(statement), "cable:read")
 
 
 @app.post(
@@ -632,7 +654,7 @@ def create_access_grant(
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_principal),
 ) -> dict[str, Any]:
-    require_permission(principal, "access_grant:create")
+    AccountScopeEndpoints(db, principal).validate_grant(payload)
     grant = AccessGrant(
         tenant_id=principal.tenant_id,
         approved_by=principal.actor_id,
@@ -665,10 +687,7 @@ def revoke_access_grant(
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_principal),
 ) -> dict[str, str]:
-    require_permission(principal, "access_grant:revoke")
-    grant = db.get(AccessGrant, grant_id)
-    if not grant:
-        raise NotFoundError("Access grant not found")
+    grant = AccountScopeEndpoints(db, principal).revocable_grant(grant_id)
     grant.status = AccessGrantStatus.REVOKED
     grant.revoked_at = datetime.now(UTC)
     grant.revoked_by = principal.actor_id
@@ -723,8 +742,10 @@ def audit_events(
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_principal),
 ) -> dict[str, Any]:
-    require_permission(principal, "audit:read")
-    statement = select(AuditEvent).order_by(AuditEvent.timestamp.desc()).limit(limit)
+    AccountScopeEndpoints(db, principal).require_member("audit:read")
+    statement = select(AuditEvent).where(
+        AuditEvent.tenant_id == principal.tenant_id,
+    ).order_by(AuditEvent.timestamp.desc()).limit(limit)
     if object_type:
         statement = statement.where(AuditEvent.object_type == object_type)
     if object_id:
@@ -827,11 +848,11 @@ if WEB_ROOT.exists():
 if WEB_REACT_DIST.exists():
     app.mount(
         "/app-next",
-        StaticFiles(directory=WEB_REACT_DIST, html=True),
+        SPAStaticFiles(directory=WEB_REACT_DIST, html=True),
         name="web-react",
     )
 
 
 @app.get("/", include_in_schema=False)
 def root() -> RedirectResponse:
-    return RedirectResponse(url="/app/")
+    return RedirectResponse(url="/app-next/" if WEB_REACT_DIST.exists() else "/app/")

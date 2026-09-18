@@ -420,7 +420,7 @@ class FloorPlanService:
             checksum_sha256=self._checksum(normalized),
             note=self._text(note, "note", 500, allow_empty=True) or f"Restored revision {source_revision}",
             created_by=principal.actor_id,
-            restored_from_revision=source_revision,
+            restored_from_revision_id=source.id,
         )
         self.db.add(revision)
         self.db.flush()
@@ -463,7 +463,10 @@ class FloorPlanService:
                     "note": row.note,
                     "created_by": str(row.created_by),
                     "created_at": row.created_at.isoformat(),
-                    "restored_from_revision": row.restored_from_revision,
+                    "restored_from_revision": (
+                        self._get(FloorPlanRevision, row.restored_from_revision_id).revision
+                        if row.restored_from_revision_id else None
+                    ),
                     "published": row.revision == plan.published_revision,
                 }
                 for row in rows[:limit]

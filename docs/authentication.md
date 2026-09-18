@@ -38,11 +38,31 @@ redirects are rejected and the discovery issuer must exactly equal the configure
 keys include issuer, JWKS URL and inline JWKS content so test or tenant configurations cannot
 reuse another key set accidentally.
 
-## Browser scaffold
+## Pre-authentication request limit
 
-`apps/web-react/` implements Authorization Code + PKCE helpers. Access tokens are held in
-`sessionStorage` and attached to API requests; decoded browser claims are never used as an
-authorization decision. The target route is `/app-next/`; `/app/` remains the verified legacy UI.
+The HTTP security middleware applies one ingress request budget per client address before
+verifying identity. `X-Tenant-ID`, `X-Actor-ID`, bearer values and source ports do not create
+separate budgets; changing these unverified values cannot reset the quota. The existing
+in-memory or shared database limiter uses this same address-based key. Database keys remain
+HMAC-pseudonymized before persistence.
+
+The address is the connection peer unless that peer is explicitly listed in
+`TRUSTED_PROXY_IPS`. For an allowed proxy, the first `X-Forwarded-For` address is used;
+without that header the peer remains the source. The trusted proxy must replace untrusted
+incoming forwarding headers. Forwarded headers from other peers are ignored.
+
+Users behind the same NAT or outbound proxy share this ingress budget, including users in
+different workspaces. Size `RATE_LIMIT_REQUESTS` and `RATE_LIMIT_WINDOW_SECONDS` for that
+shared traffic. Exempt paths, OPTIONS handling, retry headers and fail-open/fail-closed
+behavior are unchanged. An additional quota based on a verified account is future work;
+this ingress limit does not claim to be a per-user or per-tenant quota.
+
+## Browser entry
+
+The account/workspace UI and server-side OIDC browser entry are implemented; see [Account workspaces and SSO](ACCOUNT_WORKSPACES_AND_SSO.md) for setup, contracts and remaining live-provider validation.
+
+
+New browser SSO uses server-side Authorization Code + PKCE, state/nonce validation and HttpOnly JWT cookies. The frontend bootstraps its verified account and allowed workspaces through `/api/v1/auth/session`, attaching CSRF headers for cookie mutations. Existing explicit sessionStorage bearer tokens remain compatible with API calls; browser-decoded claims are never an authorization decision. `/app-next/auth/entry` preserves a safe target page. `/app/` remains the legacy UI.
 
 ## Remaining identity work
 

@@ -1,0 +1,6 @@
+.hardware-properties { padding-top: 16px; margin-top: 16px; border-top: 1px solid #dce3e9; }
+.hardware-properties h3 { margin: 0 0 8px; font-size: 14px; color: #26364a; }
+.hardware-properties > p { font-size: 12px; line-height: 1.6; color: #526274; margin: 0 0 14px; }
+.hardware-properties .ant-alert { margin-bottom: 12px; }
+.hardware-properties .ant-form-item { margin-bottom: 14px; }
+.hardware-properties .ant-checkbox-group { display: flex; gap: 16px; }

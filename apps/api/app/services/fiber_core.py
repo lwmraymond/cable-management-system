@@ -17,6 +17,8 @@ from app.fiber_models import (
 from app.models import Cable, Device, Location, Project, Tenant, utcnow
 from app.security import Principal, require_permission, resolve_principal
 
+from app.services.cable_lifecycle import lock_active_cable
+
 class FiberCoreMixin:
     def __init__(self, session: Session, principal: Principal):
         self.db = session
@@ -88,6 +90,9 @@ class FiberCoreMixin:
         return cable
 
     def provision_bundle(self, cable_id: uuid.UUID, name: str) -> dict[str, Any]:
+        cable = self._cable(cable_id)
+        self._authorize("write", cable.project_id)
+        lock_active_cable(self.db, self.principal, cable.id)
         cable = self._cable(cable_id)
         self._authorize("write", cable.project_id)
         name = self._name(name)

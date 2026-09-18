@@ -1,7 +1,7 @@
 .PHONY: test verify dry-run postgres-rls runtime-shared-rate-limit seed run
 
 test:
-	cd apps/api && PYTHONPATH=.:../.. pytest -q
+	PYTHONPATH=apps/api:. python -m pytest -q
 
 verify: test
 	cd apps/api && PYTHONPATH=. python -m compileall -q app migrations

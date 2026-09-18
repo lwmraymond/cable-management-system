@@ -25,6 +25,8 @@ from app.fiber_models import (
 )
 from app.models import Cable, CableTermination, Device, Port, utcnow
 
+from app.services.cable_lifecycle import lock_active_cable
+
 class FiberAdvancedBaseMixin:
     @staticmethod
     def _finite(value: Any, *, name: str, low: float, high: float) -> float:
@@ -238,6 +240,9 @@ class FiberAdvancedBaseMixin:
         }
 
     def provision_pairs(self, cable_id: uuid.UUID) -> dict[str, Any]:
+        cable = self._copper_cable(cable_id)
+        self._authorize("write", cable.project_id)
+        lock_active_cable(self.db, self.principal, cable.id)
         cable = self._copper_cable(cable_id)
         self._authorize("write", cable.project_id)
         count = cable.pair_count

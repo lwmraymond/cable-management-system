@@ -72,7 +72,7 @@ def test_dispatch_success_records_attempt_and_valid_signature(integration_env):
         uuid.UUID(queued["id"]),
         secret_resolver=lambda reference: SECRET,
         client=client,
-        now=datetime(2026, 9, 9, 1, 2, 3, tzinfo=UTC),
+        now=datetime.fromisoformat(queued["next_attempt_at"]) + timedelta(seconds=1),
     )
     client.close()
     assert result["state"] == "delivered" and result["attempts"] == 1
@@ -87,7 +87,7 @@ def test_retry_backoff_dead_letter_and_manual_requeue(integration_env):
     client = httpx.Client(transport=httpx.MockTransport(
         lambda request: httpx.Response(503, request=request, text="unavailable")
     ))
-    now = datetime(2026, 9, 9, 1, 0, tzinfo=UTC)
+    now = datetime.fromisoformat(queued["next_attempt_at"]) + timedelta(seconds=1)
     first = integration_env.write(
         integration_env.webhooks().dispatch_one,
         uuid.UUID(queued["id"]),

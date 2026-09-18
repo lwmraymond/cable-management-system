@@ -149,6 +149,14 @@ class PathwayCreate(APIModel):
     segments: list[SegmentCreate] = Field(default_factory=list)
 
 
+class RoutePortion(APIModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    segment_id: uuid.UUID
+    start_offset_m: float = Field(ge=0, le=1000000)
+    end_offset_m: float = Field(ge=0, le=1000000)
+    geometry_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
 class CableCreate(APIModel):
     identifier: str
     media_type: str
@@ -159,6 +167,7 @@ class CableCreate(APIModel):
     color: str | None = None
     length_m: float | None = None
     route_segment_ids: list[uuid.UUID] = Field(default_factory=list)
+    route_portions: list[RoutePortion] | None = Field(default=None, max_length=100)
 
 
 class CableRead(APIModel):

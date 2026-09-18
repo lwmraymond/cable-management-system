@@ -62,8 +62,11 @@ def test_frozen_migration_has_no_live_model_imports():
 
 
 def test_composition_entrypoint_mounts_router_without_workflows():
-    entrypoint = ROOT / "apps/api/app/main_floorplan_editor.py"
-    source = entrypoint.read_text()
-    assert "build_floorplan_router" in source
-    assert "include_router" in source
+    import importlib
+
+    for name in ("main", "main_floorplan_editor", "main_field_pwa", "main_integrations"):
+        app = importlib.import_module(f"app.{name}").app
+        paths = app.openapi()["paths"]
+        assert "/api/v1/floor-plans" in paths
+        assert any(path.startswith("/api/v1/integrations") for path in paths)
     assert not (ROOT / ".github/workflows").exists()

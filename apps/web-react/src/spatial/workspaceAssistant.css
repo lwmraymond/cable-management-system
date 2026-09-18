@@ -1,0 +1,39 @@
+.workspace-assistant { padding:14px 12px 24px; color:var(--sp-text); font-size:12px; line-height:1.6; }
+.workspace-assistant header { margin-bottom:16px; }
+.workspace-assistant h2 { font-size:16px; margin:0; }
+.workspace-assistant header>p { margin:4px 0 12px; color:var(--sp-muted); overflow-wrap:anywhere; }
+.workspace-assistant .ant-btn { font-size:12px; min-height:32px; }
+.workspace-assistant .ant-segmented { font-size:12px; }
+.assistant-workflow { list-style:none; padding:0; margin:12px 0 20px; }
+.assistant-workflow li { border-bottom:1px solid var(--sp-border); }
+.assistant-workflow button { width:100%; display:flex; gap:9px; padding:11px 2px; border:0; background:none; text-align:left; cursor:pointer; color:inherit; }
+.assistant-workflow button:disabled { opacity:.5; cursor:default; }
+.assistant-workflow button:hover:not(:disabled) { background:#f3f7fb; }
+.assistant-step-number { flex:none; width:22px; height:22px; border:1px solid #bacbda; border-radius:50%; color:#39678d; text-align:center; line-height:21px; font-size:11px; }
+.assistant-workflow strong { display:block; font-size:13px; font-weight:600; }
+.assistant-workflow small { display:block; color:var(--sp-muted); font-size:11px; line-height:1.65; }
+.assistant-operations { display:grid; gap:8px; margin:14px 0 20px; }
+.assistant-operations p,.assistant-scope-note,.assistant-check-time { color:var(--sp-muted); font-size:11px; }
+.assistant-checks { border-top:1px solid var(--sp-border); padding-top:14px; }
+.assistant-checks-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.assistant-checks h3 { font-size:14px; margin:0; }
+.assistant-scope-note { margin:7px 0; }
+.assistant-check-time { margin:0 0 10px; font-variant-numeric:tabular-nums; }
+.assistant-check-counts { display:flex; flex-wrap:wrap; gap:5px 12px; margin:12px 0; font-size:11px; }
+.assistant-check-counts span:first-child { color:#825e25; }
+.assistant-checks>.ant-segmented { margin-top:8px; }
+.assistant-warning { padding:9px; background:#fff8e9; border:1px solid #dfc69b; border-radius:5px; color:#735620; font-size:11px; }
+.assistant-no-issues { font-size:12px; color:#426550; }
+.assistant-issues { list-style:none; margin:12px 0; padding:0; }
+.assistant-issues li { border:1px solid var(--sp-border); padding:10px; border-radius:6px; margin-bottom:9px; overflow-wrap:anywhere; }
+.assistant-issues li>span { font-size:10px; color:#536d81; }
+.assistant-issues li.is-warning>span { color:#805f27; }
+.assistant-issues h4 { font-size:12px; margin:3px 0 5px; font-weight:600; }
+.assistant-issues p { color:var(--sp-muted); font-size:11px; margin:0 0 9px; }
+.assistant-connector-note { margin:20px 0 0; padding-top:12px; border-top:1px solid var(--sp-border); color:var(--sp-muted); font-size:11px; }
+.assistant-connector-note strong { display:block; font-weight:600; color:var(--sp-text); margin-bottom:4px; }
+
+.assistant-issue-object { display:block; font-size:11px; font-weight:500; color:#365f7c; margin:4px 0 6px; }
+/* Keep workflow names readable when the connection panel narrows the sidebar. */
+.workspace-assistant .ant-segmented-item-label { padding-inline:4px; }
+.assistant-checks .ant-segmented-item-label { padding-inline:2px; font-size:11px; }

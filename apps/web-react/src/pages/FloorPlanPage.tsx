@@ -7,6 +7,7 @@ import {
   Input,
   InputNumber,
   List,
+  Modal,
   Row,
   Select,
   Slider,
@@ -23,7 +24,6 @@ import {
 import type { InfrastructureContext } from "../api/context";
 import { createApiClient } from "../api/client";
 import {
-  clampPlacement,
   contextKey,
   floorPlanError,
   moveObject,
@@ -57,7 +57,7 @@ function FloorPlanWorkbench({ getContext }: Props) {
   const context = getContext();
   const alive = useRef(true);
   const inFlight = useRef(false);
-  const drag = useRef<{ objectId: string; offsetX: number; offsetY: number }>();
+  const drag = useRef<{ objectId: string; offsetX: number; offsetY: number } | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [conflict, setConflict] = useState(false);
@@ -74,10 +74,28 @@ function FloorPlanWorkbench({ getContext }: Props) {
   const [newObjectLabel, setNewObjectLabel] = useState("");
   const [newObjectWidth, setNewObjectWidth] = useState(60);
   const [newObjectHeight, setNewObjectHeight] = useState(100);
+  const [newObjectError, setNewObjectError] = useState("");
+  const [replacement, setReplacement] = useState<{ label: string; operation: () => Promise<void> }>();
 
   const canRead = permissions.includes("*") || permissions.includes("floor_plan:read");
   const canWrite = permissions.includes("*") || permissions.includes("floor_plan:write");
   const canPublish = permissions.includes("*") || permissions.includes("floor_plan:publish");
+  const canEdit = canWrite && !busy;
+  const dirty = Boolean(plan && JSON.stringify(document) !== JSON.stringify(plan.document));
+
+  useEffect(() => {
+    if (!canEdit) drag.current = undefined;
+  }, [canEdit]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [dirty]);
 
   useEffect(() => {
     alive.current = true;
@@ -113,11 +131,44 @@ function FloorPlanWorkbench({ getContext }: Props) {
     }
   }
 
+  function replaceDocument(label: string, operation: () => Promise<void>) {
+    if (inFlight.current || replacement) return;
+    if (dirty) setReplacement({ label, operation });
+    else void run(operation);
+  }
+
+  function addObject() {
+    if (!plan || !canEdit) return;
+    try {
+      const physicalId = uuid(newObjectId);
+      const next: FloorPlanObject = {
+        id: `${newObjectType}-${physicalId}`,
+        object_type: newObjectType,
+        object_id: physicalId,
+        x: document.grid_size,
+        y: document.grid_size,
+        width: newObjectWidth,
+        height: newObjectHeight,
+        rotation: 0,
+        z_index: document.objects.length,
+        locked: false,
+        label: newObjectLabel.trim() || null,
+      };
+      const nextDocument = upsertObject(document, next, plan.canvas_width, plan.canvas_height);
+      setDocument(nextDocument);
+      setSelectedId(next.id);
+      setNewObjectError("");
+    } catch (error) {
+      setNewObjectError(floorPlanError(error).message);
+    }
+  }
+
   function adopt(result: FloorPlan) {
     setPlan(result);
     setPlanId(result.id);
     setDocument(result.document);
     setSelectedId(undefined);
+    setNewObjectError("");
   }
 
   async function loadRevisions(id: string) {
@@ -140,7 +191,8 @@ function FloorPlanWorkbench({ getContext }: Props) {
     event: ReactPointerEvent<SVGGElement>,
     object: FloorPlanObject,
   ) {
-    if (object.locked) return;
+    setSelectedId(object.id);
+    if (!canEdit || object.locked) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const svg = event.currentTarget.ownerSVGElement;
     if (!svg) return;
@@ -154,7 +206,7 @@ function FloorPlanWorkbench({ getContext }: Props) {
   }
 
   function continueDrag(event: ReactPointerEvent<SVGSVGElement>) {
-    if (!plan || !drag.current) return;
+    if (!canEdit || !plan || !drag.current) return;
     const point = canvasPoint(event);
     setDocument(current => moveObject(
       current,
@@ -174,14 +226,31 @@ function FloorPlanWorkbench({ getContext }: Props) {
   return <Space orientation="vertical" size="large" style={{ display: "flex" }}>
     <Typography.Title level={2}>2D Floor Plan Editor</Typography.Title>
     <Typography.Paragraph type="secondary">
-      每次保存都会创建不可变 revision；写入、发布与恢复均使用 plan version 做乐观并发。
+      保存会保留一个历史版本；发布前请先保存画布改动。
     </Typography.Paragraph>
+    {plan && !canWrite && <Alert type="info" showIcon title="当前为只读模式，可查看和选择对象，不能修改画布。" />}
+    {dirty && <Alert type="warning" showIcon title="画布有未保存改动，请先保存新 Revision，再发布。" />}
+    <Modal
+      title="放弃未保存的画布改动？"
+      open={Boolean(replacement)}
+      okText="放弃改动并继续"
+      cancelText="保留改动"
+      okButtonProps={{ danger: true }}
+      onCancel={() => setReplacement(undefined)}
+      onOk={() => {
+        const operation = replacement?.operation;
+        setReplacement(undefined);
+        if (operation) void run(operation);
+      }}
+    >
+      <Typography.Paragraph>{replacement?.label}将替换当前画布。未保存的改动不会保留；你也可以先取消并保存。</Typography.Paragraph>
+    </Modal>
     {notice && <Alert
       type={conflict ? "warning" : "error"}
       showIcon
       title={notice}
       action={conflict && planId
-        ? <Button onClick={() => void run(async () => {
+        ? <Button disabled={busy} onClick={() => replaceDocument("重新加载服务端版本", async () => {
           const result = await api.request<FloorPlan>(`/floor-plans/${uuid(planId)}`);
           if (alive.current) adopt(result);
         })}>重新加载</Button>
@@ -193,13 +262,14 @@ function FloorPlanWorkbench({ getContext }: Props) {
         <Col flex="auto">
           <Input
             aria-label="Floor Plan UUID"
+            disabled={busy || !canRead}
             placeholder="Floor Plan UUID"
             value={planId}
             onChange={event => setPlanId(event.target.value)}
           />
         </Col>
         <Col>
-          <Button disabled={busy || !canRead} onClick={() => void run(async () => {
+          <Button disabled={busy || !canRead} onClick={() => replaceDocument("加载平面图", async () => {
             const result = await api.request<FloorPlan>(`/floor-plans/${uuid(planId)}`);
             if (alive.current) {
               adopt(result);
@@ -209,6 +279,7 @@ function FloorPlanWorkbench({ getContext }: Props) {
         </Col>
       </Row>
       <Form
+        disabled={!canEdit}
         layout="inline"
         style={{ marginTop: 12 }}
         initialValues={{
@@ -218,7 +289,7 @@ function FloorPlanWorkbench({ getContext }: Props) {
           canvas_height: 800,
           background_reference: "",
         }}
-        onFinish={values => void run(async () => {
+        onFinish={values => replaceDocument("创建并打开新平面图", async () => {
           if (!context.projectId || !context.locationId) {
             throw new Error("请先选择 Project 与 Location context。");
           }
@@ -330,7 +401,7 @@ function FloorPlanWorkbench({ getContext }: Props) {
                 key={object.id}
                 transform={`translate(${object.x} ${object.y}) rotate(${object.rotation} ${object.width / 2} ${object.height / 2})`}
                 onPointerDown={event => startDrag(event, object)}
-                style={{ cursor: object.locked ? "not-allowed" : "move" }}
+                style={{ cursor: !canEdit ? "default" : object.locked ? "not-allowed" : "move" }}
               >
                 <rect
                   width={object.width}
@@ -354,17 +425,24 @@ function FloorPlanWorkbench({ getContext }: Props) {
             <Space orientation="vertical" style={{ display: "flex" }}>
               <Select
                 aria-label="Object type"
+                disabled={!canEdit}
                 value={newObjectType}
                 options={["location", "rack", "device", "pathway"].map(value => ({ value }))}
                 onChange={setNewObjectType}
               />
               <Input
                 aria-label="Physical resource UUID"
+                disabled={!canEdit}
+                status={newObjectError ? "error" : undefined}
+                aria-invalid={Boolean(newObjectError)}
+                aria-describedby={newObjectError ? "floor-plan-resource-error" : undefined}
                 placeholder="Resource UUID"
                 value={newObjectId}
-                onChange={event => setNewObjectId(event.target.value)}
+                onChange={event => { setNewObjectId(event.target.value); setNewObjectError(""); }}
               />
+              {newObjectError && <Typography.Text id="floor-plan-resource-error" type="danger" role="alert">{newObjectError}</Typography.Text>}
               <Input
+                disabled={!canEdit}
                 aria-label="Object label"
                 placeholder="Label"
                 value={newObjectLabel}
@@ -373,40 +451,20 @@ function FloorPlanWorkbench({ getContext }: Props) {
               <Space>
                 <InputNumber
                   aria-label="Object width"
+                  disabled={!canEdit}
                   min={1}
                   value={newObjectWidth}
                   onChange={value => setNewObjectWidth(value ?? 60)}
                 />
                 <InputNumber
                   aria-label="Object height"
+                  disabled={!canEdit}
                   min={1}
                   value={newObjectHeight}
                   onChange={value => setNewObjectHeight(value ?? 100)}
                 />
               </Space>
-              <Button disabled={busy || !canWrite} onClick={() => {
-                const physicalId = uuid(newObjectId);
-                const next: FloorPlanObject = {
-                  id: `${newObjectType}-${physicalId}`,
-                  object_type: newObjectType,
-                  object_id: physicalId,
-                  x: grid,
-                  y: grid,
-                  width: newObjectWidth,
-                  height: newObjectHeight,
-                  rotation: 0,
-                  z_index: document.objects.length,
-                  locked: false,
-                  label: newObjectLabel.trim() || null,
-                };
-                setDocument(current => upsertObject(
-                  current,
-                  next,
-                  plan.canvas_width,
-                  plan.canvas_height,
-                ));
-                setSelectedId(next.id);
-              }}>加入画布</Button>
+              <Button disabled={!canEdit} onClick={addObject}>加入画布</Button>
             </Space>
           </Card>
 
@@ -416,8 +474,9 @@ function FloorPlanWorkbench({ getContext }: Props) {
                 <Typography.Text code>{selected.id}</Typography.Text>
                 <InputNumber
                   aria-label="Selected X"
+                  disabled={!canEdit || selected.locked}
                   value={selected.x}
-                  onChange={value => setDocument(current => moveObject(
+                  onChange={value => canEdit && !selected.locked && setDocument(current => moveObject(
                     current,
                     selected.id,
                     value ?? selected.x,
@@ -428,8 +487,9 @@ function FloorPlanWorkbench({ getContext }: Props) {
                 />
                 <InputNumber
                   aria-label="Selected Y"
+                  disabled={!canEdit || selected.locked}
                   value={selected.y}
-                  onChange={value => setDocument(current => moveObject(
+                  onChange={value => canEdit && !selected.locked && setDocument(current => moveObject(
                     current,
                     selected.id,
                     selected.x,
@@ -440,8 +500,9 @@ function FloorPlanWorkbench({ getContext }: Props) {
                 />
                 <Button
                   danger
-                  disabled={selected.locked}
+                  disabled={!canEdit || selected.locked}
                   onClick={() => {
+                    if (!canEdit || selected.locked) return;
                     setDocument(current => removeObject(current, selected.id));
                     setSelectedId(undefined);
                   }}
@@ -454,6 +515,7 @@ function FloorPlanWorkbench({ getContext }: Props) {
             <Space orientation="vertical" style={{ display: "flex" }}>
               <Input
                 aria-label="Change summary"
+                disabled={!canEdit}
                 placeholder="Change summary"
                 value={changeSummary}
                 onChange={event => setChangeSummary(event.target.value)}
@@ -475,7 +537,8 @@ function FloorPlanWorkbench({ getContext }: Props) {
                   await loadRevisions(result.id);
                 }
               })}>保存新 Revision</Button>
-              <Button disabled={busy || !canPublish} onClick={() => void run(async () => {
+              <Button disabled={busy || !canPublish || dirty} onClick={() => void run(async () => {
+                if (dirty) return;
                 const result = await api.request<FloorPlan>(
                   `/floor-plans/${uuid(plan.id)}/publish`,
                   {
@@ -503,7 +566,7 @@ function FloorPlanWorkbench({ getContext }: Props) {
                   key="restore"
                   size="small"
                   disabled={busy || !canWrite}
-                  onClick={() => void run(async () => {
+                  onClick={() => replaceDocument("恢复历史版本", async () => {
                     const result = await api.request<FloorPlan>(
                       `/floor-plans/${uuid(plan.id)}/revisions/${uuid(revision.id)}/restore`,
                       {

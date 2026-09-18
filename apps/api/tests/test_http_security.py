@@ -115,3 +115,60 @@ def test_security_headers_and_strict_cors_are_present() -> None:
     assert "default-src 'self'" in response.headers["content-security-policy"]
     rejected = client.get("/resource", headers={"Origin": "https://evil.example"})
     assert "access-control-allow-origin" not in rejected.headers
+
+
+def test_identity_header_rotation_cannot_reset_ingress_rate_limit() -> None:
+    client = TestClient(security_app(base_settings()))
+    headers = {"Authorization": "Bearer same-credential"}
+    responses = [
+        client.get(
+            "/resource", headers={**headers, "X-Tenant-ID": "tenant-a", "X-Actor-ID": "actor-a"}
+        ),
+        client.get(
+            "/resource", headers={**headers, "X-Tenant-ID": "tenant-b", "X-Actor-ID": "actor-b"}
+        ),
+        client.get("/resource", headers=headers),
+        client.get(
+            "/resource", headers={**headers, "X-Tenant-ID": "tenant-c", "X-Actor-ID": "actor-c"}
+        ),
+    ]
+    assert [response.status_code for response in responses] == [200, 200, 429, 429]
+    assert responses[-1].headers["x-ratelimit-remaining"] == "0"
+
+
+def test_source_addresses_have_separate_budgets_but_source_ports_do_not() -> None:
+    application = security_app(base_settings(rate_limit_requests=1))
+    first = TestClient(application, client=("203.0.113.10", 40000))
+    same_address = TestClient(application, client=("203.0.113.10", 40001))
+    second = TestClient(application, client=("203.0.113.11", 40000))
+    assert first.get("/resource").status_code == 200
+    assert same_address.get("/resource").status_code == 429
+    assert second.get("/resource").status_code == 200
+    assert second.get("/resource").status_code == 429
+
+
+def test_untrusted_forwarded_headers_cannot_rotate_the_rate_limit_source() -> None:
+    application = security_app(
+        base_settings(rate_limit_requests=1, trusted_proxy_ips=["10.0.0.10"])
+    )
+    client = TestClient(application, client=("198.51.100.20", 40000))
+    assert client.get("/resource", headers={"X-Forwarded-For": "203.0.113.10"}).status_code == 200
+    assert client.get("/resource", headers={"X-Forwarded-For": "203.0.113.11"}).status_code == 429
+
+
+def test_trusted_proxy_uses_forwarded_client_and_falls_back_to_peer() -> None:
+    application = security_app(
+        base_settings(rate_limit_requests=1, trusted_proxy_ips=["10.0.0.10"])
+    )
+    client = TestClient(application, client=("10.0.0.10", 40000))
+    assert (
+        client.get("/resource", headers={"X-Forwarded-For": "203.0.113.10, 10.0.0.20"}).status_code
+        == 200
+    )
+    assert (
+        client.get("/resource", headers={"X-Forwarded-For": "203.0.113.10, 10.0.0.21"}).status_code
+        == 429
+    )
+    assert client.get("/resource", headers={"X-Forwarded-For": "203.0.113.11"}).status_code == 200
+    assert client.get("/resource").status_code == 200
+    assert client.get("/resource").status_code == 429

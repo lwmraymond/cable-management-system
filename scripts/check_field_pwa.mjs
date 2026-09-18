@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const queueSource = fs.readFileSync("apps/web/field/offline-queue.js", "utf8");
+const pageSource = fs.readFileSync("apps/web/field/index.html", "utf8");
 const appSource = fs.readFileSync("apps/web/field/app.js", "utf8");
 const workerSource = fs.readFileSync("apps/web/field/sw.js", "utf8");
 const manifest = JSON.parse(fs.readFileSync("apps/web/field/manifest.webmanifest", "utf8"));
@@ -28,7 +29,7 @@ const checks = {
   conflictClassification: queueSource.includes('return "conflict"'),
   invalidClassification: queueSource.includes('return "invalid"'),
   retryClassification: queueSource.includes('return "retry"'),
-  noAutomaticConflictOverwrite: appSource.includes("Automatic overwrite is disabled"),
+  noAutomaticConflictOverwrite: pageSource.includes("Automatic overwrite is disabled"),
   retryAsNew: queueSource.includes("retryAsNew"),
   tenantClear: queueSource.includes("clearTenant"),
   cameraPermission: appSource.includes("getUserMedia"),

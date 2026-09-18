@@ -10,7 +10,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
-from app.api.floorplan import build_floorplan_router
 from app.exceptions import ConflictError
 from app.security import Principal
 from app.services.fiber import FiberService
@@ -119,7 +118,4 @@ def build_fiber_router(get_db: Callable, get_principal: Callable) -> APIRouter:
         return FiberService(db, principal).trace(strand_id, entry_side, max_hops)
 
     root.include_router(router)
-    # Mount Floor Plan beside /fiber under the host API prefix without requiring
-    # a large unrelated rewrite of app.main.
-    root.include_router(build_floorplan_router(get_db, get_principal))
     return root

@@ -4,6 +4,9 @@ Revision ID: 200000000005
 Revises: 200000000004
 Frozen migration delegates to immutable versioned helpers only.
 """
+import importlib.util
+from pathlib import Path
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -25,12 +28,10 @@ TENANT_TABLES = [
     "otdr_events",
 ]
 
-import importlib.util
-from pathlib import Path
 
 
 def _load(name: str):
-    path = Path(__file__).with_name(f"{name}.py")
+    path = Path(__file__).resolve().parents[1] / "helpers" / f"{name}.py"
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Cannot load frozen migration helper: {path}")

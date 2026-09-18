@@ -1,0 +1,61 @@
+.spatial-location-picker { max-width: 1120px; margin-inline: auto; min-width: 0; }
+.spatial-location-picker-heading { align-items: flex-start; }
+.spatial-location-picker-heading h1 { overflow-wrap: anywhere; }
+.spatial-location-picker .spatial-location-back { display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; padding-block: 8px; color: #38698c; font-size: 14px; }
+.spatial-location-context { margin: -2px 0 0; color: #64748b; font-size: 13px; overflow-wrap: anywhere; }
+.spatial-location-browser { padding: 20px; min-width: 0; }
+.spatial-location-search-row { display: flex; align-items: flex-end; gap: 16px; justify-content: space-between; }
+.spatial-location-search { flex: 1; max-width: 580px; min-width: 0; }
+.spatial-location-search label { display: block; margin-bottom: 7px; color: #334155; font-size: 13px; font-weight: 600; }
+.spatial-location-count { padding-bottom: 6px; flex-shrink: 0; color: #64748b; font-size: 13px; }
+.spatial-location-count strong { color: #334155; }
+.spatial-location-navigation { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: 20px; }
+.spatial-location-navigation nav { min-width: 0; }
+.spatial-location-navigation ol { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 8px; margin: 0; padding: 0; list-style: none; }
+.spatial-location-navigation li { display: inline-flex; align-items: baseline; gap: 8px; min-width: 0; max-width: 100%; color: #64748b; font-size: 13px; overflow-wrap: anywhere; }
+.spatial-location-navigation li + li::before { content: "/"; color: #94a3b8; }
+.spatial-location-navigation nav button { border: 0; background: transparent; padding: 4px 0; color: #38698c; cursor: pointer; text-align: left; font: inherit; overflow-wrap: anywhere; }
+.spatial-location-navigation nav button[aria-current] { color: #1e293b; font-weight: 600; }
+.spatial-location-navigation nav button:disabled { cursor: not-allowed; color: #94a3b8; }
+.spatial-location-navigation nav button:focus-visible, .spatial-location-card:focus-visible { outline: 2px solid #38698c; outline-offset: 3px; }
+.spatial-location-navigation > .ant-btn { flex-shrink: 0; }
+.spatial-location-directory-note, .spatial-location-search-summary { margin: 10px 0 18px; color: #64748b; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.spatial-location-state { display: flex; min-height: 180px; align-items: center; justify-content: center; gap: 10px; color: #64748b; font-size: 14px; }
+.spatial-location-group + .spatial-location-group { margin-top: 22px; }
+.spatial-location-group h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: #334155; font-size: 14px; font-weight: 600; }
+.spatial-location-group h2 > span { color: #64748b; font-size: 12px; font-weight: 400; }
+.spatial-location-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 10px; }
+.spatial-location-card { display: flex; align-items: flex-start; gap: 12px; width: 100%; min-width: 0; padding: 16px; border: 1px solid #dce5ed; border-radius: 8px; background: #fff; color: #334155; text-align: left; font: inherit; cursor: pointer; transition: border-color 120ms, background-color 120ms; }
+.spatial-location-card:hover:not(:disabled) { border-color: #86a8bf; background: #f8fafc; }
+.spatial-location-card[aria-pressed="true"] { border-color: #38698c; background: #f0f6fa; }
+.spatial-location-card:disabled { cursor: not-allowed; opacity: .65; }
+.spatial-location-card-icon { display: inline-flex; padding: 9px; border-radius: 6px; background: #f1f5f9; color: #52728c; font-size: 18px; }
+.spatial-location-card-content { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
+.spatial-location-card-title { color: #1e293b; font-size: 15px; font-weight: 600; line-height: 1.5; }
+.spatial-location-identifier, .spatial-location-result-path { color: #64748b; font-size: 12px; line-height: 1.6; }
+.spatial-location-card-type { align-self: flex-start; margin-top: 3px; padding: 1px 6px; border-radius: 4px; background: #eef2f6; color: #52677b; font-size: 12px; line-height: 1.6; }
+.spatial-location-card-arrow { margin-top: 8px; color: #64748b; font-size: 13px; }
+.spatial-location-selection { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 20px; }
+.spatial-location-selection-description { min-width: 0; overflow-wrap: anywhere; }
+.spatial-location-selection-label { color: #64748b; font-size: 12px; }
+.spatial-location-selection h2 { margin: 6px 0; color: #1e293b; font-size: 17px; }
+.spatial-location-selection p { margin: 5px 0 0; color: #64748b; font-size: 13px; line-height: 1.6; }
+.spatial-location-selection .spatial-location-selected-path { color: #475569; }
+.spatial-location-selection > .ant-btn { flex-shrink: 0; }
+@media (max-width: 600px) {
+  .spatial-location-picker-heading { flex-direction: column; gap: 6px; }
+  .spatial-location-browser, .spatial-location-selection { padding: 16px; }
+  .spatial-location-search-row { flex-direction: column; align-items: stretch; gap: 7px; }
+  .spatial-location-count { padding: 0; }
+  .spatial-location-selection { flex-direction: column; align-items: stretch; gap: 14px; }
+  .spatial-location-grid { grid-template-columns: minmax(0, 1fr); }
+  .spatial-location-card { padding: 13px; }
+}
+@media (prefers-reduced-motion: reduce) { .spatial-location-card { transition: none; } }
+
+.spatial-location-entry { max-width:1168px; margin:0 auto; padding:32px 24px 40px; }
+.spatial-location-entry .spatial-location-picker { display:flex; flex-direction:column; gap:16px; }
+.spatial-location-entry .spatial-location-picker-heading { margin-bottom:8px; }
+.spatial-directory-create-section { margin-top:16px; }
+.spatial-location-entry > .ant-alert { margin-bottom:16px; }
+@media(max-width:600px) { .spatial-location-entry { padding:24px 16px 32px; } }

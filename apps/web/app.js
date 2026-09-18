@@ -493,3 +493,23 @@ async function boot() {
 }
 
 boot();
+
+async function downloadCableSchedule() {
+  const button = $("#export-cables");
+  setBusy(button, true);
+  try {
+    const response = await fetch(`${API}/reports/cable-schedule.csv`, { headers: headersFor() });
+    if (!response.ok) throw new Error(`导出失败：HTTP ${response.status}`);
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "cable-schedule.csv";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    announce(error.message, "error");
+  } finally {
+    setBusy(button, false);
+  }
+}
+$("#export-cables").addEventListener("click", downloadCableSchedule);

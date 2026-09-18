@@ -63,6 +63,16 @@ class Settings(BaseSettings):
     oidc_tenant_claim: str = "tenant_id"
     oidc_allow_verified_email_linking: bool = False
 
+    # Browser SSO is server-side and opt-in; no issuer credentials reach the SPA.
+    sso_enabled: bool = False
+    sso_client_id: str = ""
+    sso_client_secret: str | None = None
+    sso_redirect_uri: str = ""
+    sso_authorization_url: str | None = None
+    sso_token_url: str | None = None
+    sso_state_secret: str = ""
+    sso_state_ttl_seconds: int = 300
+
     rate_limit_enabled: bool = True
     rate_limit_backend: Literal["memory", "database"] = "memory"
     rate_limit_requests: int = 240
@@ -124,6 +134,39 @@ class Settings(BaseSettings):
         if self.cookie_samesite == "none" and not self.cookie_secure:
             raise ValueError("SameSite=None cookies must be Secure")
 
+        if self.sso_enabled:
+            if self.auth_mode == "demo" or not self.cookie_auth_enabled:
+                raise ValueError("Browser SSO requires OIDC/hybrid and cookie authentication")
+            if not self.sso_client_id.strip() or len(self.sso_state_secret) < 32:
+                raise ValueError(
+                    "Browser SSO requires a client ID and a state secret of 32+ characters"
+                )
+            if not 60 <= self.sso_state_ttl_seconds <= 900:
+                raise ValueError("Browser SSO state lifetime must be between 60 and 900 seconds")
+            for value in (
+                self.oidc_issuer_url,
+                self.sso_redirect_uri,
+                self.sso_authorization_url,
+                self.sso_token_url,
+            ):
+                if value:
+                    self.validate_sso_url(value)
+            callback = urlparse(self.sso_redirect_uri)
+            if (
+                not self.sso_redirect_uri
+                or callback.query
+                or callback.fragment
+                or callback.path != f"{self.api_prefix}/auth/callback"
+            ):
+                raise ValueError("SSO redirect URI must be the absolute API /auth/callback URL")
+            if callback.scheme == "https" and not self.cookie_secure:
+                raise ValueError("HTTPS browser SSO requires Secure cookies")
+            if any(
+                algorithm.startswith("HS") or algorithm == "none"
+                for algorithm in self.oidc_algorithms
+            ):
+                raise ValueError("Browser SSO requires asymmetric OIDC signing algorithms")
+
         if self.app_env.lower() == "production":
             if self.auth_mode != "oidc" or self.demo_mode:
                 raise ValueError("Production requires AUTH_MODE=oidc and DEMO_MODE=false")
@@ -141,10 +184,31 @@ class Settings(BaseSettings):
                 raise ValueError("Production OIDC issuer must use HTTPS")
             if self.oidc_jwks_url and urlparse(self.oidc_jwks_url).scheme != "https":
                 raise ValueError("Production OIDC JWKS URL must use HTTPS")
-            insecure_origins = [origin for origin in self.cors_origins if not origin.startswith("https://")]
+            insecure_origins = [
+                origin for origin in self.cors_origins if not origin.startswith("https://")
+            ]
             if insecure_origins:
                 raise ValueError("Production CORS origins must use HTTPS")
         return self
+
+    def validate_sso_url(self, value: str) -> None:
+        parsed = urlparse(value)
+        local_http = (
+            self.app_env.lower() != "production"
+            and parsed.scheme == "http"
+            and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+        )
+        if (
+            not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.fragment
+            or (parsed.scheme != "https" and not local_http)
+            or any(ord(char) < 33 for char in value)
+        ):
+            raise ValueError(
+                "Browser SSO URLs require HTTPS (HTTP is allowed only on local loopback)"
+            )
 
 
 @lru_cache

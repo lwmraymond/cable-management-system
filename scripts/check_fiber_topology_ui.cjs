@@ -15,6 +15,8 @@ const files = [
   "apps/web-react/src/pages/FiberTopologyPage.tsx",
   "apps/web-react/src/pages/fiberUi.ts",
   "apps/web-react/src/pages/fiberTopologyUi.ts",
+  "apps/web-react/src/pages/FiberChannelBreakoutPanel.tsx",
+  "apps/web-react/src/pages/FiberOtdrPanel.tsx",
 ];
 for (const file of files) {
   const result = ts.transpileModule(fs.readFileSync(path.join(root, file), "utf8"), {
@@ -68,8 +70,8 @@ assert.match(api.traceItemText({ kind: "splice", slot_number: 4, loss_db: 0.1 })
 assert.match(fs.readFileSync(path.join(root, files[0]), "utf8"), /path="fiber-topology"/);
 assert.match(fs.readFileSync(path.join(root, files[1]), "utf8"), /Fiber Topology/);
 assert.match(fs.readFileSync(path.join(root, files[3]), "utf8"), /key=\{contextKey\(getContext\(\)\)\}/);
-assert.match(fs.readFileSync(path.join(root, files[3]), "utf8"), /\/fiber\/otdr-records/);
-assert.match(fs.readFileSync(path.join(root, files[3]), "utf8"), /\/fiber\/breakouts/);
-assert.match(fs.readFileSync(path.join(root, files[3]), "utf8"), /\/fiber\/channels/);
-console.log("PASS: 6 TypeScript/TSX syntax checks; strict advanced helper typecheck; 18 parser/route assertions.");
+assert.match(fs.readFileSync(path.join(root, files[7]), "utf8"), /\/fiber\/otdr-records/);
+assert.match(fs.readFileSync(path.join(root, files[6]), "utf8"), /\/fiber\/breakouts/);
+assert.match(fs.readFileSync(path.join(root, files[6]), "utf8"), /\/fiber\/channels/);
+console.log("PASS: 8 TypeScript/TSX syntax checks; strict advanced helper typecheck; 18 parser/route assertions.");
 console.log("NOT EXECUTED: full React/Ant Design dependency typecheck, Vite build, browser E2E.");

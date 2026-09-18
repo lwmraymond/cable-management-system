@@ -1,0 +1,37 @@
+.locations-page { min-width: 0; }
+.locations-page > .ant-alert { margin-bottom: 16px; }
+.locations-directory { min-width: 0; overflow: hidden; }
+.locations-directory-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 22px 0; }
+.locations-directory-heading h2 { margin: 0; color: #172b42; font-size: 16px; font-weight: 600; }
+.locations-directory-heading p { margin: 5px 0 0; color: #64748b; font-size: 13px; }
+.locations-counts { display: flex; flex-wrap: wrap; gap: 8px 22px; color: #64748b; font-size: 13px; }
+.locations-counts strong { margin-left: 6px; color: #1e3a55; font-size: 17px; font-variant-numeric: tabular-nums; }
+.locations-filters { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; padding: 20px 22px; }
+.locations-filters label { display: block; margin-bottom: 6px; color: #475569; font-size: 13px; }
+.locations-search { flex: 1 1 260px; min-width: 0; }
+.locations-type-filter { flex: 0 1 220px; min-width: 180px; }
+.locations-type-filter .ant-select { width: 100%; }
+.locations-filters > .ant-btn { flex: none; }
+.locations-table .ant-table { font-size: 13px; }
+.locations-table .ant-table-container { border-top: 1px solid #e2e8f0; }
+.locations-table .ant-table-thead > tr > th { color: #475569; font-size: 12px; font-weight: 600; background: #f8fafc; }
+.locations-table .ant-table-tbody > tr > td { vertical-align: top; }
+.locations-name, .locations-parent { display: flex; min-width: 0; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
+.locations-name strong { color: #1e293b; font-weight: 600; line-height: 1.6; }
+.locations-name > span, .locations-parent small { color: #64748b; font-size: 12px; line-height: 1.5; }
+.locations-parent > span { line-height: 1.6; }
+.locations-muted { color: #64748b; }
+.locations-type-tag { display: inline-block; max-width: 100%; padding: 2px 8px; border: 1px solid #dce4ec; border-radius: 5px; color: #475569; background: #f8fafc; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.locations-scene-action.ant-btn { height: auto; min-height: 30px; padding: 1px 0; font-size: 13px; }
+.locations-table .ant-pagination { padding: 0 20px; }
+.locations-scope-note { margin: 0; padding: 14px 22px 18px; border-top: 1px solid #edf1f5; color: #64748b; font-size: 12px; line-height: 1.7; }
+@media (max-width: 680px) {
+  .locations-directory-heading { align-items: flex-start; flex-direction: column; gap: 12px; padding: 16px 16px 0; }
+  .locations-filters { padding: 16px; gap: 10px; }
+  .locations-search { flex-basis: 100%; }
+  .locations-type-filter { flex: 1 1 160px; min-width: 0; }
+  .locations-scope-note { padding: 12px 16px; }
+}
+
+.locations-scroll-hint { display:none; }
+@media (max-width:767px) { .locations-scroll-hint { display:block; padding:0 16px 12px; margin:0; color:var(--workspace-muted); font-size:12px; line-height:1.6; } }

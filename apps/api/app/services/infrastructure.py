@@ -8,9 +8,19 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.audit import record_audit
-from app.exceptions import ConflictError, NotFoundError, ValidationError
-from app.models import Device, DeviceTemplate, Location, Pathway, PathwaySegment, Port, PortMapping, Rack
+from app.exceptions import AuthorizationError, ConflictError, ValidationError
+from app.models import (
+    Device,
+    DeviceTemplate,
+    Location,
+    Pathway,
+    PathwaySegment,
+    Port,
+    PortMapping,
+    Rack,
+)
 from app.security import Principal, require_permission
+from app.services.resource_scope import ResourceScope
 
 
 @dataclass(frozen=True)
@@ -30,6 +40,11 @@ class InfrastructureService:
         self.session = session
         self.principal = principal
 
+    def _authorization(self, permission: str) -> ResourceScope:
+        scope = ResourceScope(self.session, self.principal)
+        require_permission(scope.principal, permission)
+        return scope
+
     def create_location(
         self,
         *,
@@ -42,9 +57,11 @@ class InfrastructureService:
         transform_3d: dict | None = None,
         floor_plan_reference: str | None = None,
     ) -> Location:
-        require_permission(self.principal, "location:create")
-        if parent_id and not self.session.get(Location, parent_id):
-            raise NotFoundError("Parent location not found in tenant")
+        scope = self._authorization("location:create")
+        if parent_id:
+            scope.require(scope.get(Location, parent_id), "location:create")
+        elif not scope.principal.is_tenant_member:
+            raise AuthorizationError("Only workspace members can create top-level locations")
         location = Location(
             tenant_id=self.principal.tenant_id,
             parent_id=parent_id,
@@ -83,11 +100,10 @@ class InfrastructureService:
         rotation: float = 0,
         reserved_units: list[int] | None = None,
     ) -> Rack:
-        require_permission(self.principal, "rack:create")
+        scope = self._authorization("rack:create")
         if not 1 <= height_u <= 60:
             raise ValidationError("Rack height must be between 1U and 60U")
-        if not self.session.get(Location, location_id):
-            raise NotFoundError("Rack location not found in tenant")
+        scope.require(scope.get(Location, location_id), "rack:create")
         reserved = sorted(set(reserved_units or []))
         if any(u < 1 or u > height_u for u in reserved):
             raise ValidationError("Reserved U positions must be inside the rack")
@@ -130,7 +146,9 @@ class InfrastructureService:
         height_mm: int | None = None,
         model_3d_reference: str | None = None,
     ) -> DeviceTemplate:
-        require_permission(self.principal, "device:create")
+        scope = self._authorization("device:create")
+        if not scope.principal.is_tenant_member:
+            raise AuthorizationError("Only workspace members can create device templates")
         if rack_units < 1 or rack_units > 20:
             raise ValidationError("Template rack units must be between 1 and 20")
         template = DeviceTemplate(
@@ -167,11 +185,11 @@ class InfrastructureService:
         start_u: int,
         face: str = "front",
     ) -> Device:
-        require_permission(self.principal, "device:create")
-        rack = self.session.get(Rack, rack_id)
-        template = self.session.get(DeviceTemplate, template_id)
-        if not rack or not template:
-            raise NotFoundError("Rack or device template not found in tenant")
+        scope = self._authorization("device:create")
+        rack = scope.get(Rack, rack_id)
+        template = scope.get(DeviceTemplate, template_id)
+        scope.get(Location, rack.location_id)
+        scope.require(rack, "device:create")
         end_u = start_u + template.rack_units - 1
         if start_u < 1 or end_u > rack.height_u:
             raise ValidationError("Device exceeds rack height")
@@ -180,6 +198,8 @@ class InfrastructureService:
         overlap = self.session.scalar(
             select(Device.id).where(
                 Device.rack_id == rack_id,
+                Device.tenant_id == self.principal.tenant_id,
+                Device.deleted_at.is_(None),
                 Device.face == face,
                 and_(
                     Device.start_u <= end_u,
@@ -228,8 +248,12 @@ class InfrastructureService:
                 if blueprint.get("mapping_key"):
                     grouped.setdefault(str(blueprint["mapping_key"]), []).append(port)
         for ports in grouped.values():
-            front = sorted((p for p in ports if p.front_or_rear == "front"), key=lambda p: p.position_index)
-            rear = sorted((p for p in ports if p.front_or_rear == "rear"), key=lambda p: p.position_index)
+            front = sorted(
+                (p for p in ports if p.front_or_rear == "front"), key=lambda p: p.position_index
+            )
+            rear = sorted(
+                (p for p in ports if p.front_or_rear == "rear"), key=lambda p: p.position_index
+            )
             for source, target in zip(front, rear, strict=False):
                 self.session.add(
                     PortMapping(
@@ -259,9 +283,8 @@ class InfrastructureService:
         capacity_area_mm2: float | None = None,
         segments: list[dict[str, Any]] | None = None,
     ) -> Pathway:
-        require_permission(self.principal, "pathway:create")
-        if not self.session.get(Location, location_id):
-            raise NotFoundError("Pathway location not found")
+        scope = self._authorization("pathway:create")
+        scope.require(scope.get(Location, location_id), "pathway:create")
         pathway = Pathway(
             tenant_id=self.principal.tenant_id,
             location_id=location_id,
@@ -296,13 +319,22 @@ class InfrastructureService:
         return pathway
 
     def rack_elevation(self, rack_id: uuid.UUID) -> dict[str, Any]:
-        require_permission(self.principal, "rack:read")
-        rack = self.session.get(Rack, rack_id)
-        if not rack:
-            raise NotFoundError("Rack not found in tenant")
-        devices = self.session.scalars(
-            select(Device).where(Device.rack_id == rack.id).order_by(Device.start_u.desc())
-        ).all()
+        scope = self._authorization("rack:read")
+        rack = scope.get(Rack, rack_id)
+        scope.get(Location, rack.location_id)
+        scope.require(rack, "rack:read")
+        devices = scope.visible(
+            self.session.scalars(
+                select(Device)
+                .where(
+                    Device.rack_id == rack.id,
+                    Device.tenant_id == self.principal.tenant_id,
+                    Device.deleted_at.is_(None),
+                )
+                .order_by(Device.start_u.desc())
+            ),
+            "rack:read",
+        )
         device_ids = [d.id for d in devices]
         port_counts = {device_id: 0 for device_id in device_ids}
         if device_ids:
@@ -310,7 +342,11 @@ class InfrastructureService:
                 dict(
                     self.session.execute(
                         select(Port.device_id, func.count(Port.id))
-                        .where(Port.device_id.in_(device_ids))
+                        .where(
+                            Port.device_id.in_(device_ids),
+                            Port.tenant_id == self.principal.tenant_id,
+                            Port.deleted_at.is_(None),
+                        )
                         .group_by(Port.device_id)
                     ).all()
                 )

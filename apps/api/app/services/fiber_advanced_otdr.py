@@ -25,6 +25,8 @@ from app.fiber_models import (
 )
 from app.models import Cable, CableTermination, Device, Port, utcnow
 
+from app.services.cable_lifecycle import lock_active_cable
+
 class FiberAdvancedOtdrMixin:
     def create_otdr_record(
         self,
@@ -43,6 +45,10 @@ class FiberAdvancedOtdrMixin:
         events: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         cable = self._cable(cable_id)
+        if cable.project_id != project_id:
+            raise AuthorizationError("OTDR record cable is outside the requested project")
+        self._authorize("write", project_id)
+        cable = lock_active_cable(self.db, self.principal, cable.id)
         if cable.project_id != project_id:
             raise AuthorizationError("OTDR record cable is outside the requested project")
         self._authorize("write", project_id)

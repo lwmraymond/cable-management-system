@@ -1,9 +1,9 @@
 import { MathUtils, Quaternion, Vector3, type PerspectiveCamera } from "three";
 
 type MovementOptions = { isAllowed: () => boolean; onMove: () => void };
-const movementKeys = new Set(["KeyW", "KeyS", "KeyA", "KeyD"]);
+const movementKeys = new Set(["KeyW", "KeyS", "KeyA", "KeyD", "Space", "ShiftLeft", "ShiftRight"]);
 
-/** Focus-scoped horizontal camera translation; only held movement keys schedule frames. */
+/** Focus-scoped translation: WASD horizontal, Space up, either Shift down. */
 export class CameraMovement {
   private readonly document: Document;
   private readonly window: Window | null;
@@ -16,7 +16,6 @@ export class CameraMovement {
   private readonly rotation = new Quaternion();
   private frame: number | null = null;
   private lastTime: number | null = null;
-  private accelerated = false;
   private disposed = false;
 
   constructor(private readonly canvas: HTMLCanvasElement, private readonly camera: PerspectiveCamera, private readonly target: Vector3, private readonly options: MovementOptions) {
@@ -40,6 +39,8 @@ export class CameraMovement {
 
   private code(event: KeyboardEvent): string | null {
     if (event.code) return movementKeys.has(event.code) ? event.code : null;
+    if (event.key === " " || event.key === "Spacebar") return "Space";
+    if (event.key === "Shift") return "ShiftLeft";
     const code = `Key${event.key.toUpperCase()}`;
     return movementKeys.has(code) ? code : null;
   }
@@ -47,9 +48,14 @@ export class CameraMovement {
   private readonly keyDown = (event: KeyboardEvent): void => {
     if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing || event.keyCode === 229) { this.stop(); return; }
     if (["escape", "f", "1", "2", "3"].includes(event.key.toLowerCase())) { this.stop(); return; }
-    if (!this.allowed()) { this.stop(); return; }
-    this.accelerated = event.shiftKey;
     const code = this.code(event);
+    if (event.defaultPrevented || event.target !== this.canvas) { this.stop(); return; }
+    if (!this.allowed()) {
+      // A focused canvas owns Space even when an editing mode suspends navigation.
+      // Inputs and buttons retain their native typing/activation semantics.
+      if (code === "Space" && this.document.activeElement === this.canvas) event.preventDefault();
+      this.stop(); return;
+    }
     // A cancelled gesture requires a fresh press, not the OS's repeating keydown.
     if (!code || (event.repeat && !this.keys.has(code))) return;
     event.preventDefault();
@@ -60,7 +66,6 @@ export class CameraMovement {
   private readonly keyUp = (event: KeyboardEvent): void => {
     const code = this.code(event);
     if (code) this.keys.delete(code);
-    this.accelerated = event.shiftKey;
     if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing || !this.allowed()) this.stop();
     else this.schedule();
   };
@@ -70,13 +75,13 @@ export class CameraMovement {
   private readonly blur = (): void => { this.pointers.clear(); this.stop(); };
   private readonly visibilityChange = (): void => { if (this.document.hidden) this.blur(); };
 
-  private axes(): [number, number] {
-    return [Number(this.keys.has("KeyD")) - Number(this.keys.has("KeyA")), Number(this.keys.has("KeyW")) - Number(this.keys.has("KeyS"))];
+  private axes(): [number, number, number] {
+    return [Number(this.keys.has("KeyD")) - Number(this.keys.has("KeyA")), Number(this.keys.has("KeyW")) - Number(this.keys.has("KeyS")), Number(this.keys.has("Space")) - Number(this.keys.has("ShiftLeft") || this.keys.has("ShiftRight"))];
   }
 
   private schedule(): void {
-    const [sideways, forward] = this.axes();
-    if (!sideways && !forward) { this.pause(); return; }
+    const [sideways, forward, vertical] = this.axes();
+    if (!sideways && !forward && !vertical) { this.pause(); return; }
     if (this.frame === null && this.allowed()) this.frame = requestAnimationFrame(this.tick);
   }
 
@@ -85,8 +90,8 @@ export class CameraMovement {
     if (!this.allowed()) { this.stop(); return; }
     const seconds = this.lastTime === null ? 0 : MathUtils.clamp((time - this.lastTime) / 1000, 0, 0.05);
     this.lastTime = time;
-    const [sideways, forwards] = this.axes();
-    if (seconds > 0 && (sideways || forwards)) {
+    const [sideways, forwards, vertical] = this.axes();
+    if (seconds > 0 && (sideways || forwards || vertical)) {
       this.camera.getWorldDirection(this.forward).setY(0);
       if (this.forward.lengthSq() < 0.000001) {
         this.forward.copy(this.camera.up).setY(0);
@@ -95,8 +100,8 @@ export class CameraMovement {
       if (this.forward.lengthSq() < 0.000001) this.forward.set(0, 0, -1);
       this.forward.normalize();
       this.right.crossVectors(this.forward, this.worldUp).normalize();
-      const speed = MathUtils.clamp(Math.sqrt(this.camera.position.distanceTo(this.target)) * 0.65, 0.25, 3) * (this.accelerated ? 2.25 : 1);
-      this.delta.copy(this.forward).multiplyScalar(forwards).addScaledVector(this.right, sideways).normalize().multiplyScalar(speed * seconds);
+      const speed = MathUtils.clamp(Math.sqrt(this.camera.position.distanceTo(this.target)) * 0.65, 0.25, 3);
+      this.delta.copy(this.forward).multiplyScalar(forwards).addScaledVector(this.right, sideways).addScaledVector(this.worldUp, vertical).normalize().multiplyScalar(speed * seconds);
       this.camera.position.add(this.delta);
       this.target.add(this.delta);
       this.options.onMove();
@@ -110,7 +115,7 @@ export class CameraMovement {
     this.lastTime = null;
   }
 
-  readonly stop = (): void => { this.keys.clear(); this.accelerated = false; this.pause(); };
+  readonly stop = (): void => { this.keys.clear(); this.pause(); };
 
   dispose(): void {
     if (this.disposed) return;

@@ -7,6 +7,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app import fiber_models  # noqa: F401 -- register extension metadata
 from app import floorplan_models  # noqa: F401 -- register Floor Plan metadata
+from app import cad_models  # noqa: F401 -- register CAD exchange history
 from app.config import get_settings
 from app.models import Base
 

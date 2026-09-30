@@ -8,20 +8,22 @@ type Props = {
   engine: RefObject<InfrastructureScene | null>;
   connectionMode?: boolean; onPortConnect?: (a: string, b: string) => void;
   onInstallDrop?: (kind: string, placement: ScenePlacement) => void;
-  placementMode?: boolean; panMode?: boolean;
+  placementMode?: boolean; panMode?: boolean; keyboardMovementEnabled?: boolean;
   onPlace?: (placement: ScenePlacement | null) => void; onCancelTool?: () => void;
   measurementMode?: boolean; measurementPoints?: SceneMeasurementPoint[]; onMeasure?: (point: SceneMeasurementPoint | null) => void;
 };
-export function SpatialCanvas({ data, selection, layers, onSelect, onReady, engine, connectionMode = false, onPortConnect, onInstallDrop, placementMode = false, panMode = false, onPlace, onCancelTool, measurementMode = false, measurementPoints, onMeasure }: Props) {
+export function SpatialCanvas({ data, selection, layers, onSelect, onReady, engine, connectionMode = false, onPortConnect, onInstallDrop, placementMode = false, panMode = false, keyboardMovementEnabled = true, onPlace, onCancelTool, measurementMode = false, measurementPoints, onMeasure }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState("");
   const lastLayout = useRef("");
+  const movementAllowed = useRef(keyboardMovementEnabled);
+  movementAllowed.current = keyboardMovementEnabled;
   const callbacks = useRef({ onSelect, onReady, onPortConnect, onPlace, onCancelTool, onMeasure });
   useEffect(() => { callbacks.current = { onSelect, onReady, onPortConnect, onPlace, onCancelTool, onMeasure }; }, [onSelect, onReady, onPortConnect, onPlace, onCancelTool, onMeasure]);
   useEffect(() => {
     if (!canvas.current) return;
     try {
-      engine.current = new InfrastructureScene(canvas.current, value => callbacks.current.onSelect(value), { onPortConnect: (a, b) => callbacks.current.onPortConnect?.(a, b), onPlacement: placement => callbacks.current.onPlace?.(placement), onMeasure: point => callbacks.current.onMeasure?.(point) });
+      engine.current = new InfrastructureScene(canvas.current, value => callbacks.current.onSelect(value), { isCameraMovementAllowed: () => movementAllowed.current, onPortConnect: (a, b) => callbacks.current.onPortConnect?.(a, b), onPlacement: placement => callbacks.current.onPlace?.(placement), onMeasure: point => callbacks.current.onMeasure?.(point) });
       callbacks.current.onReady(true);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "WebGL 初始化失败"); }
     return () => { engine.current?.dispose(); engine.current = null; callbacks.current.onReady(false); };
@@ -41,7 +43,7 @@ export function SpatialCanvas({ data, selection, layers, onSelect, onReady, engi
   useEffect(() => { engine.current?.setMeasurementMode(measurementMode); }, [engine, measurementMode]);
   useEffect(() => { engine.current?.setMeasurement(measurementPoints ?? []); }, [engine, measurementPoints]);
   return <>
-    <canvas ref={canvas} className="spatial-canvas" tabIndex={0} aria-describedby="spatial-camera-help" aria-keyshortcuts="W A S D Shift+W Shift+A Shift+S Shift+D F 1 2 3" aria-label={measurementMode ? "三维图示测距。左键依次点击同一房间内的地板或对象表面，拖动旋转，WASD移动；Escape退出。长度依据当前模型坐标。" : placementMode ? "三维放置模式。左键单击地板或机柜选择安装位置，拖动旋转，右键平移；Escape取消工具。" : panMode ? "三维平移模式。左键或单指拖动平移；滚轮或双指缩放，双指拖动旋转；Escape取消工具。" : connectionMode ? "三维端口连接模式。点击机柜或设备选择接口，或从空闲端口拖到另一端口；Escape取消接线工具。" : "三维空间。鼠标拖动旋转，右键拖动平移，滚轮缩放；也可使用视角按钮和左侧对象列表选择。"}
+    <canvas ref={canvas} className="spatial-canvas" tabIndex={0} aria-describedby="spatial-camera-help" aria-keyshortcuts="W A S D Space Shift F 1 2 3" aria-label={measurementMode ? "三维图示测距。左键依次点击同一房间内的地板或对象表面，拖动旋转；Escape退出。长度依据当前模型坐标。" : placementMode ? "三维放置模式。左键单击地板或机柜选择安装位置，拖动旋转，右键平移；Escape取消工具。" : panMode ? "三维平移模式。左键或单指拖动平移；滚轮或双指缩放，双指拖动旋转；Escape取消工具。" : connectionMode ? "三维端口连接模式。点击机柜或设备选择接口，或从空闲端口拖到另一端口；Escape取消接线工具。" : "三维空间。鼠标拖动旋转，右键拖动平移，滚轮缩放；也可使用视角按钮和左侧对象列表选择。"}
       onDragOver={event => {
         if (onInstallDrop && event.dataTransfer.types.includes("application/x-cable-install")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }
       }}

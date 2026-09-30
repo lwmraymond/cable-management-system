@@ -26,6 +26,15 @@ function respond(body: string | null, status: number, contentType = "application
 }
 
 describe("API response recovery", () => {
+  it("retains scoped headers while allowing the browser to supply a multipart boundary", async () => {
+    const fetchMock = respond("{}", 201);
+    const body = new FormData(); body.append("file", new File(["synthetic"], "scene.dxf"));
+    await api.request("/scene/cad/imports", { method: "POST", body });
+    const init = fetchMock.mock.calls[0][1];
+    expect(init.body).toBe(body);
+    expect(init.headers.get("X-Tenant-ID")).toBe("tenant");
+    expect(init.headers.has("Content-Type")).toBe(false);
+  });
   it("accepts empty successful deletes without trying to parse JSON", async () => {
     const fetchMock = respond(null, 204);
     await expect(api.request("/members/alice", { method: "DELETE" })).resolves.toBeUndefined();

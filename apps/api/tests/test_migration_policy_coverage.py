@@ -7,6 +7,7 @@ from app import field_models  # noqa: F401 -- register field tables independentl
 from app import integration_models  # noqa: F401 -- register connector tables
 from app import fiber_models  # noqa: F401 -- include extension tables
 from app import floorplan_models  # noqa: F401 -- include Floor Plan tables
+from app import cad_models  # noqa: F401 -- include immutable CAD history
 from app.models import AuditEvent, Base, TenantOwnedMixin
 
 
@@ -32,6 +33,7 @@ def test_postgresql_rls_covers_every_tenant_table() -> None:
     floorplan, _ = load_migration("200000000006_floor_plan_editor.py")
     field, _ = load_migration("200000000007_field_mutation_receipts.py")
     integrations, _ = load_migration("200000000008_netbox_signed_webhooks.py")
+    cad, _ = load_migration("200000000013_cad_exchange.py")
     assert (
         set(module.TENANT_TABLES)
         | set(fiber.TENANT_TABLES)
@@ -39,6 +41,7 @@ def test_postgresql_rls_covers_every_tenant_table() -> None:
         | set(floorplan.TENANT_TABLES)
         | set(field.TENANT_TABLES)
         | set(integrations.TENANT_TABLES)
+        | set(cad.TENANT_TABLES)
     ) == model_tables
 
 

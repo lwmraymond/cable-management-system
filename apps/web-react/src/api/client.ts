@@ -130,7 +130,7 @@ export function createApiClient(options: ApiClientOptions) {
     const token = logout ? null : readAccessToken();
     if (logout) headers.delete("Authorization");
     else if (token) headers.set("Authorization", `Bearer ${token}`);
-    if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+    if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
     attachCsrf(headers, init.method);
     const response = await fetch(`${baseUrl}${path}`, { ...init, headers, credentials: "same-origin" });
     return await readResponse(response, guard, !logout) as T;

@@ -26,6 +26,7 @@ from app.api.projects import build_projects_router
 from app.api.workspaces import build_workspaces_router
 from app.api.browser_auth import build_browser_auth_router
 from app.audit import record_audit
+from app.cad_upload_limit import CadUploadLimitMiddleware
 from app.config import get_settings
 from app.db import SessionLocal
 from app.exceptions import DomainError, NotFoundError
@@ -101,6 +102,7 @@ app.include_router(build_projects_router(get_db, get_principal), prefix=settings
 app.include_router(build_workspaces_router(), prefix=settings.api_prefix)
 app.include_router(build_browser_auth_router(), prefix=settings.api_prefix)
 app.add_middleware(FieldIdempotencyMiddleware, api_prefix=settings.api_prefix)
+app.add_middleware(CadUploadLimitMiddleware)
 app.add_middleware(SecurityBoundaryMiddleware, settings=settings)
 app.add_middleware(
     CORSMiddleware,

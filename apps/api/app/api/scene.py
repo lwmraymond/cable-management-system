@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.scene_editor import build_scene_editor_router
+from app.api.cad import build_cad_router
 from app.security import Principal
 from app.services.scene import SceneService
 
@@ -45,4 +46,5 @@ def build_scene_router(get_db: Callable, get_principal: Callable) -> APIRouter:
         )
 
     router.include_router(build_scene_editor_router(get_db, get_principal))
+    router.include_router(build_cad_router(get_db, get_principal))
     return router

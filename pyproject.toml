@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=9,<10", "ruff>=0.14,<0.15"]
+cad = ["ezdxf==1.4.4", "ifcopenshell==0.9.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["apps/api/tests", "tests/fiber", "tests/floorplan", "tests/field", "tests/integrations"]

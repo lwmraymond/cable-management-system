@@ -448,7 +448,8 @@ def test_migration_009_backfills_existing_pathways_and_round_trips(tmp_path):
                 "2026-01-01",
             ),
         )
-    migrate("upgrade", "head")
+    # Test the reversible 009 migration itself; CAD 013 intentionally refuses downgrade.
+    migrate("upgrade", "200000000009")
     with sqlite3.connect(database) as connection:
         assert json.loads(
             connection.execute("SELECT cable_policy FROM pathways").fetchone()[0]

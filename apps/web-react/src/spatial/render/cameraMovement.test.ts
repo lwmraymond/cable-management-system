@@ -98,13 +98,42 @@ describe("focused canvas camera movement", () => {
     expectVector(camera.position.clone().sub(beforeForward), [0, 0, -0.065]);
   });
 
-  it("applies Shift acceleration while held and returns to normal speed on release", () => {
+  it("moves vertically on held Space and Shift without changing orientation or accelerating WASD", () => {
     const start = camera.position.clone();
-    press(); press("ShiftLeft", "Shift", { shiftKey: true }); frame(0); frame(50);
-    expect(camera.position.distanceTo(start)).toBeCloseTo(0.065 * 2.25, 10);
-    release("ShiftLeft", "Shift");
-    const beforeNormal = camera.position.clone(); frame(100);
-    expect(camera.position.distanceTo(beforeNormal)).toBeCloseTo(0.065, 10);
+    const orientation = camera.quaternion.clone();
+    expect(press("Space", " ").defaultPrevented).toBe(true); frame(0); frame(50);
+    expectVector(camera.position.clone().sub(start), [0, 0.065, 0]);
+    expectVector(target, [0, 3.065, 0]);
+    release("Space", " "); expect(frames.size).toBe(0);
+    press("ShiftRight", "Shift", { shiftKey: true }); frame(100); frame(150);
+    expectVector(camera.position, start);
+    release("ShiftRight", "Shift");
+    press(); press("ShiftLeft", "Shift", { shiftKey: true }); frame(200); frame(250);
+    expect(camera.position.distanceTo(start)).toBeCloseTo(0.065, 10);
+    expect(camera.position.y).toBeLessThan(start.y);
+    expect(camera.quaternion.angleTo(orientation)).toBeLessThan(1e-7);
+  });
+
+  it("cancels opposite vertical keys and tracks both Shift keys until the last release", () => {
+    const start = camera.position.clone();
+    press("Space", " "); press("ShiftLeft", "Shift", { shiftKey: true }); frame(0); frame(50);
+    expectVector(camera.position, start); expect(frames.size).toBe(0);
+    press("ShiftRight", "Shift", { shiftKey: true }); release("ShiftLeft", "Shift");
+    frame(100); expectVector(camera.position, start);
+    release("Space", " "); frame(150); frame(200);
+    expect(camera.position.y).toBeLessThan(start.y);
+    release("ShiftRight", "Shift"); expect(frames.size).toBe(0);
+  });
+
+  it.each(["input", "textarea", "select", "button", "div"])("leaves Space and Shift to focused %s controls", tag => {
+    const input = document.createElement(tag); input.tabIndex = 0;
+    if (tag === "div") input.contentEditable = "true";
+    document.body.append(input); input.focus();
+    const start = camera.position.clone();
+    expect(key("keydown", "Space", " ", {}, input).defaultPrevented).toBe(false);
+    expect(key("keydown", "ShiftLeft", "Shift", { shiftKey: true }, input).defaultPrevented).toBe(false);
+    frame(0); frame(50); expectVector(camera.position, start); expect(frames.size).toBe(0);
+    input.remove();
   });
 
   it("bounds speed at close and distant views and caps movement after a long frame", () => {
@@ -224,6 +253,8 @@ describe("focused canvas camera movement", () => {
   it("checks movement permission before starting and during motion, without restarting from key repeat", () => {
     allowed.mockReturnValue(false);
     expect(press().defaultPrevented).toBe(false);
+    expect(press("Space", " ").defaultPrevented).toBe(true);
+    expect(press("ShiftLeft", "Shift", { shiftKey: true }).defaultPrevented).toBe(false);
     expect(frames.size).toBe(0);
     allowed.mockReturnValue(true); press(); frame(0); frame(50);
     const stopped = camera.position.clone();

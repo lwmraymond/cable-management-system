@@ -98,7 +98,7 @@ export class InfrastructureScene {
   private connectionPreview: Line2 | null = null;
   private pointerStart: { x: number; y: number; id: number; dragged: boolean } | null = null;
 
-  constructor(private readonly canvas: HTMLCanvasElement, private readonly onSelect: (selection: Selection) => void, private readonly options: { onPortConnect?: (a: string, b: string) => void; onPlacement?: (placement: ScenePlacement | null) => void; onMeasure?: (point: SceneMeasurementPoint | null) => void } = {}) {
+  constructor(private readonly canvas: HTMLCanvasElement, private readonly onSelect: (selection: Selection) => void, private readonly options: { onPortConnect?: (a: string, b: string) => void; onPlacement?: (placement: ScenePlacement | null) => void; onMeasure?: (point: SceneMeasurementPoint | null) => void; isCameraMovementAllowed?: () => boolean } = {}) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -130,7 +130,7 @@ export class InfrastructureScene {
     this.controls.maxPolarAngle = Math.PI / 2 - 0.015;
     this.controls.addEventListener("change", this.invalidate);
     this.movement = new CameraMovement(canvas, this.camera, this.controls.target, {
-      isAllowed: () => !this.disposed && this.controls.enabled && !this.pointerStart,
+      isAllowed: () => !this.disposed && this.controls.enabled && !this.pointerStart && !this.connectionMode && !this.placementMode && !this.measurementMode && (this.options.isCameraMovementAllowed?.() ?? true),
       onMove: () => { this.controls.update(); this.invalidate(); },
     });
     this.raycaster.params.Line = { threshold: 0.035 };

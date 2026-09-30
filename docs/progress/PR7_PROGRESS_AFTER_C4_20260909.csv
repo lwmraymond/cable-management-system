@@ -1,0 +1,10 @@
+order,node,status,implementation_score,evidence_or_blocker,next_gate
+1,PostgreSQL ordinary-role Forced RLS,IMPLEMENTED_EXTERNAL_VALIDATION_PENDING,75,Attack harness and offline policies exist; ordinary-role DSNs unavailable,Execute real raw-SQL matrix with non-owner NOSUPERUSER NOBYPASSRLS roles
+2,Keycloak PKCE refresh logout MFA expiry,CORE_IMPLEMENTED_LIVE_VALIDATION_PENDING,65,JWT/JWKS/API identity boundary exists; browser lifecycle needs reachable realm,Run PKCE refresh logout MFA and session-expiry browser lifecycle
+3,MinIO S3 ClamAV lifecycle,IMPLEMENTATION_PENDING,15,Only configuration and extension foundations are verified,Implement secure object lifecycle and local service-stack tests
+4,Fiber API UI OTDR Breakout generic Trace,REMOTE_SOURCE_AND_REPRODUCIBLE_TESTS_PUBLISHED_RERUN_PENDING,85,C1 47 tests; C2/C3 71-case evidence; source and rerun entrypoints published,Run exact-head targeted/full regression React build and browser E2E
+5,2D Floor Plan Editor,IMPLEMENTED_ISOLATED_LOCAL_GATES_PASSED_FULL_RERUN_PENDING,82,24 backend API migration tests plus strict helper and 24 UI assertions,Run exact-head full regression dependency build and real browser interaction tests
+6,Camera QR PWA queue conflicts,NEXT_IMPLEMENTATION_NODE,5,Existing QR foundations only,Implement secure scan durable IndexedDB queue idempotency replay and conflict UX
+7,NetBox signed retry webhook,NOT_STARTED,10,Export and ADR foundations only,Implement adapter durable outbox HMAC replay protection and retries
+8,OpenTelemetry logs metrics traces alerts,NOT_STARTED,5,Request ID and security logging foundations only,Implement traces metrics exporter failure behavior alerts and runbooks
+9,PITR attachments RPO RTO,EXTERNAL_VALIDATION_PENDING,10,Backup/deployment foundations only and storage implementation incomplete,Complete storage then run isolated destructive drill with measured RPO RTO

@@ -15,6 +15,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_platform_db, get_principal
+from app.api.fiber import build_fiber_router
+from app.api.fiber_advanced import build_fiber_advanced_router
 from app.audit import record_audit
 from app.config import get_settings
 from app.db import SessionLocal
@@ -68,6 +70,7 @@ from app.services.connectivity import ConnectivityService
 from app.services.infrastructure import InfrastructureService
 from app.services.labels import LabelService
 from app.services.reporting import ReportingService
+from app.services.topology_trace import TopologyTraceService
 from app.services.workflow import CableWorkflowService
 
 settings = get_settings()
@@ -78,6 +81,8 @@ app = FastAPI(
     openapi_url=f"{settings.api_prefix}/openapi.json",
     docs_url=f"{settings.api_prefix}/docs",
 )
+app.include_router(build_fiber_router(get_db, get_principal), prefix=settings.api_prefix)
+app.include_router(build_fiber_advanced_router(get_db, get_principal), prefix=settings.api_prefix)
 app.add_middleware(SecurityBoundaryMiddleware, settings=settings)
 app.add_middleware(
     CORSMiddleware,
@@ -495,10 +500,18 @@ def create_cable(
 @app.get(f"{settings.api_prefix}/cables/{{cable_id}}/trace", tags=["connectivity"])
 def trace_cable(
     cable_id: uuid.UUID,
+    strand_number: Annotated[int | None, Query(ge=1, le=576)] = None,
+    pair_number: Annotated[int | None, Query(ge=1, le=600)] = None,
+    max_nodes: Annotated[int, Query(ge=2, le=1000)] = 500,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_principal),
 ) -> dict[str, Any]:
-    return ConnectivityService(db, principal).trace_cable(cable_id)
+    return TopologyTraceService(db, principal).trace_cable(
+        cable_id,
+        strand_number=strand_number,
+        pair_number=pair_number,
+        max_nodes=max_nodes,
+    )
 
 
 @app.get(

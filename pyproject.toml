@@ -21,7 +21,7 @@ dependencies = [
 dev = ["pytest>=9,<10", "ruff>=0.14,<0.15"]
 
 [tool.pytest.ini_options]
-testpaths = ["apps/api/tests"]
+testpaths = ["apps/api/tests", "tests/fiber"]
 addopts = "-ra"
 
 [tool.ruff]

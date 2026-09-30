@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>2D Floor Plan Editor</title>
+  <style>
+    :root { color-scheme: light; font: 14px/1.45 system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f3f5f7; color: #182026; }
+    header { display:flex; align-items:center; gap:10px; padding:10px 14px; background:#0b2942; color:white; }
+    header h1 { font-size:16px; margin:0 16px 0 0; }
+    button,input,select { font:inherit; padding:6px 8px; }
+    button { cursor:pointer; }
+    main { display:grid; grid-template-columns:320px minmax(0,1fr) 300px; height:calc(100vh - 53px); }
+    aside { overflow:auto; padding:12px; background:white; border-right:1px solid #d8dee4; }
+    aside.right { border-right:0; border-left:1px solid #d8dee4; }
+    fieldset { margin:0 0 12px; border:1px solid #d8dee4; border-radius:4px; }
+    legend { font-weight:700; }
+    label { display:block; margin:6px 0; }
+    label span { display:block; color:#52606d; font-size:12px; }
+    label input,label select { width:100%; }
+    .row { display:flex; gap:6px; flex-wrap:wrap; }
+    .row > * { flex:1 1 auto; }
+    #viewport { overflow:hidden; position:relative; background:#cfd8df; touch-action:none; }
+    #canvas { position:absolute; left:50%; top:50%; transform-origin:0 0; background:white; box-shadow:0 3px 20px #0004; }
+    #canvas.grid { background-image:linear-gradient(#e9edf1 1px,transparent 1px),linear-gradient(90deg,#e9edf1 1px,transparent 1px); }
+    .object { position:absolute; border:2px solid #1769aa; background:#dceeffcc; padding:4px; overflow:hidden; user-select:none; cursor:grab; }
+    .object.annotation { border-color:#8e5b00; background:#fff3c4dd; }
+    .object.selected { outline:3px solid #f59e0b; z-index:100001!important; }
+    .status { padding:8px; border-radius:4px; background:#eef2f5; white-space:pre-wrap; }
+    .status.error { background:#ffe8e6; color:#a8071a; }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    th,td { border-bottom:1px solid #e5e7eb; padding:5px; text-align:left; }
+    .muted { color:#697784; font-size:12px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>2D Floor Plan Editor</h1>
+  <button id="zoomOut">−</button><span id="zoomLabel">100%</span><button id="zoomIn">+</button>
+  <button id="fit">Fit</button><button id="toggleGrid">Grid</button>
+  <span style="flex:1"></span><button id="save">Save revision</button><button id="publish">Publish</button>
+</header>
+<main>
+  <aside>
+    <fieldset><legend>Request context</legend>
+      <label><span>Tenant UUID</span><input id="tenant" /></label>
+      <label><span>Actor UUID</span><input id="actor" /></label>
+      <label><span>Project UUID</span><input id="project" /></label>
+      <label><span>Location UUID</span><input id="location" /></label>
+    </fieldset>
+    <fieldset><legend>Plan</legend>
+      <label><span>Plan UUID</span><input id="planId" /></label>
+      <div class="row"><button id="load">Load</button><button id="create">Create</button></div>
+      <label><span>Name</span><input id="planName" value="Main floor" /></label>
+      <div class="row"><label><span>Width mm</span><input id="planWidth" type="number" value="30000" /></label><label><span>Height mm</span><input id="planHeight" type="number" value="20000" /></label></div>
+      <label><span>Grid mm</span><input id="gridSize" type="number" value="500" /></label>
+    </fieldset>
+    <fieldset><legend>Add object</legend>
+      <label><span>Kind</span><select id="kind"><option>rack</option><option>device</option><option>location</option><option>pathway</option><option>annotation</option></select></label>
+      <label><span>Resource UUID (not used for annotation)</span><input id="resourceId" /></label>
+      <label><span>Label</span><input id="objectLabel" /></label>
+      <button id="addObject">Add at centre</button>
+    </fieldset>
+    <div id="status" class="status">Load or create a plan.</div>
+  </aside>
+  <section id="viewport"><div id="canvas" class="grid"></div></section>
+  <aside class="right">
+    <fieldset><legend>Selected object</legend>
+      <label><span>Label</span><input id="selectedLabel" /></label>
+      <div class="row"><label><span>X mm</span><input id="selectedX" type="number" /></label><label><span>Y mm</span><input id="selectedY" type="number" /></label></div>
+      <div class="row"><label><span>Width mm</span><input id="selectedWidth" type="number" /></label><label><span>Height mm</span><input id="selectedHeight" type="number" /></label></div>
+      <label><span>Rotation°</span><input id="selectedRotation" type="number" /></label>
+      <div class="row"><button id="applySelected">Apply</button><button id="removeSelected">Remove</button></div>
+    </fieldset>
+    <fieldset><legend>History</legend>
+      <button id="refreshHistory">Refresh</button>
+      <table><thead><tr><th>Rev</th><th>Note</th><th></th></tr></thead><tbody id="history"></tbody></table>
+    </fieldset>
+    <p class="muted">Writes use optimistic versioning. A 409 never overwrites newer server state; reload, compare and retry deliberately.</p>
+  </aside>
+</main>
+<script type="module" src="./floorplan-editor.js"></script>
+</body>
+</html>

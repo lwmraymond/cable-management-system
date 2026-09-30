@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.audit import record_audit
 from app.exceptions import ConflictError, NotFoundError, ValidationError
+from app.fiber_models import PhysicalPortClaim
 from app.models import (
     Cable,
     CableRouteSegment,
@@ -58,9 +59,22 @@ class ConnectivityService:
                     f"Cable media {cable_media} is incompatible with port {port.identifier} "
                     f"media {port.media_type}"
                 )
+        port_ids = [port_a.id, port_b.id]
         occupied = self.session.scalar(
-            select(CableTermination.id).where(CableTermination.port_id.in_([port_a.id, port_b.id]))
+            select(PhysicalPortClaim.id).where(
+                PhysicalPortClaim.port_id.in_(port_ids),
+                PhysicalPortClaim.deleted_at.is_(None),
+            )
         )
+        # The fallback protects databases still being repaired/backfilled and makes
+        # the boundary safe even if a legacy row was inserted outside this service.
+        if occupied is None:
+            occupied = self.session.scalar(
+                select(CableTermination.id).where(
+                    CableTermination.port_id.in_(port_ids),
+                    CableTermination.deleted_at.is_(None),
+                )
+            )
         if occupied:
             raise ConflictError("One or more ports are already physically terminated")
 
@@ -94,22 +108,35 @@ class ConnectivityService:
         )
         self.session.add(cable)
         self.session.flush()
-        self.session.add_all(
-            [
-                CableTermination(
-                    tenant_id=self.principal.tenant_id,
-                    cable_id=cable.id,
-                    side="A",
-                    port_id=port_a.id,
-                ),
-                CableTermination(
-                    tenant_id=self.principal.tenant_id,
-                    cable_id=cable.id,
-                    side="B",
-                    port_id=port_b.id,
-                ),
-            ]
+        termination_a = CableTermination(
+            tenant_id=self.principal.tenant_id,
+            cable_id=cable.id,
+            side="A",
+            port_id=port_a.id,
         )
+        termination_b = CableTermination(
+            tenant_id=self.principal.tenant_id,
+            cable_id=cable.id,
+            side="B",
+            port_id=port_b.id,
+        )
+        self.session.add_all([termination_a, termination_b])
+        self.session.flush()
+        self.session.add_all([
+            PhysicalPortClaim(
+                tenant_id=self.principal.tenant_id,
+                port_id=port_a.id,
+                owner_type="cable_termination",
+                owner_id=termination_a.id,
+            ),
+            PhysicalPortClaim(
+                tenant_id=self.principal.tenant_id,
+                port_id=port_b.id,
+                owner_type="cable_termination",
+                owner_id=termination_b.id,
+            ),
+        ])
+        self.session.flush()
         for sequence, segment_id in enumerate(route_segment_ids or [], start=1):
             if not self.session.get(PathwaySegment, segment_id):
                 raise NotFoundError("Pathway segment not found in tenant")
@@ -164,7 +191,9 @@ class ConnectivityService:
             ).all()
             cable_ids = {row.cable_id for row in terminations} - expanded_cables
             if cable_ids:
-                cable_rows = self.session.scalars(select(Cable).where(Cable.id.in_(cable_ids))).all()
+                cable_rows = self.session.scalars(
+                    select(Cable).where(Cable.id.in_(cable_ids))
+                ).all()
                 cables.update({c.id: c for c in cable_rows})
                 all_terms = self.session.scalars(
                     select(CableTermination).where(CableTermination.cable_id.in_(cable_ids))
@@ -208,7 +237,9 @@ class ConnectivityService:
     def _longest_path_containing_cable(
         adjacency: dict[uuid.UUID, list[Edge]], selected_cable_id: uuid.UUID
     ) -> tuple[list[uuid.UUID], list[Edge]]:
-        leaves = [node for node, edges in adjacency.items() if len(edges) <= 1] or list(adjacency)[:1]
+        leaves = [
+            node for node, edges in adjacency.items() if len(edges) <= 1
+        ] or list(adjacency)[:1]
         best_nodes: list[uuid.UUID] = []
         best_edges: list[Edge] = []
 
@@ -322,6 +353,7 @@ class ConnectivityService:
             if edge.kind == "cable":
                 linked = cables.get(edge.resource_id) or self.session.get(Cable, edge.resource_id)
                 if linked:
+                    status = linked.installation_status
                     items.append(
                         {
                             "kind": "cable",
@@ -329,7 +361,7 @@ class ConnectivityService:
                             "identifier": linked.identifier,
                             "media_type": linked.media_type,
                             "construction": linked.construction,
-                            "status": linked.installation_status.value,
+                            "status": status.value if hasattr(status, "value") else str(status),
                             "route": self._route_for_cable(linked.id),
                             "selected": linked.id == cable.id,
                         }

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SIM Field">
+  <rect width="512" height="512" rx="96" fill="#0b2942"/>
+  <path fill="#fff" d="M112 96h112v112H112V96zm32 32v48h48v-48h-48zm144-32h112v112H288V96zm32 32v48h48v-48h-48zM112 304h112v112H112V304zm32 32v48h48v-48h-48z"/>
+  <path fill="#61b5e8" d="M272 248h48v48h-48zm64 0h64v48h-64zm-64 64h48v104h-48zm64 0h64v40h-64zm0 56h32v48h-32z"/>
+</svg>

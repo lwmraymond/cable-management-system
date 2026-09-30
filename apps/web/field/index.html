@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0b2942" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <title>SIM Field</title>
+  <style>
+    :root{font:16px/1.4 system-ui,sans-serif;color:#17202a;background:#eef2f5}
+    *{box-sizing:border-box}body{margin:0}header{position:sticky;top:0;z-index:3;background:#0b2942;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px}header h1{margin:0;font-size:19px}header span{margin-left:auto;font-size:13px}
+    main{max-width:760px;margin:auto;padding:12px}.card{background:#fff;border:1px solid #d8dee4;border-radius:8px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px #0001}h2{font-size:17px;margin:0 0 10px}label{display:block;margin:8px 0}label span{display:block;color:#52606d;font-size:12px}input,select,textarea,button{width:100%;font:inherit;padding:11px;border:1px solid #aab4be;border-radius:6px}button{background:#1769aa;color:#fff;border:0;font-weight:650;min-height:44px}button.secondary{background:#52606d}button.danger{background:#a8071a}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}video{width:100%;max-height:360px;background:#111;border-radius:6px}#queue article{border-top:1px solid #e5e7eb;padding:10px 0}#queue article:first-child{border-top:0}.badge{display:inline-block;padding:2px 7px;border-radius:12px;background:#e6f4ff;color:#0958d9;font-size:12px}.badge.conflict,.badge.invalid,.badge.auth-blocked{background:#fff1f0;color:#a8071a}.muted{color:#697784;font-size:13px}.status{white-space:pre-wrap;background:#eef2f5;border-radius:6px;padding:10px}.status.error{background:#fff1f0;color:#a8071a}dialog{max-width:680px;width:calc(100% - 24px);border:0;border-radius:8px;padding:18px}dialog::backdrop{background:#0008}@media(max-width:520px){.row,.row3{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<header><h1>SIM Field</h1><span id="network">checking…</span></header>
+<main>
+  <section class="card"><h2>Field context</h2>
+    <label><span>Tenant UUID</span><input id="tenant" autocomplete="off" /></label>
+    <label><span>Actor UUID</span><input id="actor" autocomplete="off" /></label>
+    <div class="row"><label><span>Project UUID</span><input id="project" /></label><label><span>Location UUID</span><input id="location" /></label></div>
+    <div class="row"><button id="saveContext">Use context</button><button id="clearTenant" class="danger">Clear tenant queue</button></div>
+  </section>
+
+  <section class="card"><h2>Camera QR</h2>
+    <video id="camera" playsinline muted></video>
+    <div class="row"><button id="startCamera">Start camera</button><button id="stopCamera" class="secondary">Stop</button></div>
+    <label><span>Manual QR payload fallback</span><textarea id="qrText" rows="3" placeholder='{"type":"cable","id":"..."}'></textarea></label>
+    <button id="parseQr">Validate payload</button>
+    <div id="scanResult" class="status">No validated resource.</div>
+  </section>
+
+  <section class="card"><h2>Queue field mutation</h2>
+    <label><span>Action</span><select id="action"><option value="install">Mark cable installed</option><option value="custom">Custom API mutation</option></select></label>
+    <label><span>Resource UUID</span><input id="resourceId" /></label>
+    <label><span>API path for custom action</span><input id="customPath" value="/api/v1/" /></label>
+    <label><span>JSON body (optional)</span><textarea id="body" rows="4">{}</textarea></label>
+    <button id="enqueue">Add to durable queue</button>
+  </section>
+
+  <section class="card"><h2>Offline queue</h2>
+    <div class="row"><button id="sync">Sync now</button><button id="refresh" class="secondary">Refresh</button></div>
+    <div id="queue" class="muted">Queue is empty.</div>
+  </section>
+</main>
+<dialog id="conflictDialog"><h2>Conflict requires a person</h2><p>The server rejected this mutation with 409. Compare the local mutation and server response. Automatic overwrite is disabled.</p><pre id="conflictBody"></pre><div class="row3"><button id="retryConflict">Retry as new</button><button id="discardConflict" class="danger">Discard</button><button id="closeConflict" class="secondary">Close</button></div></dialog>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
